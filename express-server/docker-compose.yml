@@ -1,0 +1,637 @@
+version: '3.9'
+
+x-service-defaults: &service-defaults
+  restart: unless-stopped
+  networks:
+    - boardpilot
+  logging:
+    driver: "json-file"
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+x-healthcheck-defaults: &healthcheck-defaults
+  interval: 30s
+  timeout: 10s
+  retries: 3
+  start_period: 40s
+
+services:
+  # ============================================================
+  # Infrastructure
+  # ============================================================
+
+  postgres:
+    <<: *service-defaults
+    image: postgres:16-alpine
+    container_name: boardpilot-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-boardpilot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-boardpilot_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-boardpilot}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-boardpilot}"]
+
+  mongodb:
+    <<: *service-defaults
+    image: mongo:7-jammy
+    container_name: boardpilot-mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:-boardpilot}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-boardpilot_secret}
+      MONGO_INITDB_DATABASE: boardpilot
+    volumes:
+      - mongodb_data:/data/db
+      - ./docker/mongodb/init:/docker-entrypoint-initdb.d
+    ports:
+      - "27017:27017"
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+
+  redis:
+    <<: *service-defaults
+    image: redis:7-alpine
+    container_name: boardpilot-redis
+    command: redis-server --requirepass ${REDIS_PASSWORD:-boardpilot_redis_secret} --maxmemory 512mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-boardpilot_redis_secret}", "ping"]
+
+  elasticsearch:
+    <<: *service-defaults
+    image: elasticsearch:8.12.0
+    container_name: boardpilot-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+      - ELASTIC_PASSWORD=${ELASTICSEARCH_PASSWORD:-boardpilot_elastic_secret}
+      - xpack.security.enabled=true
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD-SHELL", "curl -s -u elastic:${ELASTICSEARCH_PASSWORD:-boardpilot_elastic_secret} http://localhost:9200/_cluster/health | grep -q '\"status\":\"green\\|yellow\"'"]
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+
+  rabbitmq:
+    <<: *service-defaults
+    image: rabbitmq:3.12-management-alpine
+    container_name: boardpilot-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-boardpilot}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-boardpilot_secret}
+      RABBITMQ_DEFAULT_VHOST: /
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+      - ./docker/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+
+  # ============================================================
+  # Monitoring
+  # ============================================================
+
+  prometheus:
+    <<: *service-defaults
+    image: prom/prometheus:v2.49.1
+    container_name: boardpilot-prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+
+  grafana:
+    <<: *service-defaults
+    image: grafana/grafana:10.3.1
+    container_name: boardpilot-grafana
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning
+      - ./docker/grafana/dashboards:/var/lib/grafana/dashboards
+    ports:
+      - "3100:3000"
+    depends_on:
+      - prometheus
+
+  jaeger:
+    <<: *service-defaults
+    image: jaegertracing/all-in-one:1.54
+    container_name: boardpilot-jaeger
+    environment:
+      COLLECTOR_OTLP_ENABLED: 'true'
+    ports:
+      - "16686:16686"
+      - "4317:4317"
+      - "4318:4318"
+
+  # ============================================================
+  # Services
+  # ============================================================
+
+  api-gateway:
+    <<: *service-defaults
+    build:
+      context: ./services/api-gateway
+      dockerfile: Dockerfile
+      target: production
+    container_name: boardpilot-api-gateway
+    env_file: ./services/api-gateway/.env
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      SERVICE_NAME: api-gateway
+    ports:
+      - "3000:3000"
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD-SHELL", "curl -sf http://localhost:3000/health || exit 1"]
+
+  identity-service:
+    <<: *service-defaults
+    build:
+      context: ./services/identity-service
+      dockerfile: Dockerfile
+      target: production
+    container_name: boardpilot-identity-service
+    env_file: ./services/identity-service/.env
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      SERVICE_NAME: identity-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD-SHELL", "curl -sf http://localhost:3001/health || exit 1"]
+
+  user-service:
+    <<: *service-defaults
+    build:
+      context: ./services/user-service
+      dockerfile: Dockerfile
+      target: production
+    container_name: boardpilot-user-service
+    env_file: ./services/user-service/.env
+    environment:
+      NODE_ENV: production
+      PORT: 3002
+      SERVICE_NAME: user-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD-SHELL", "curl -sf http://localhost:3002/health || exit 1"]
+
+  organization-service:
+    <<: *service-defaults
+    build:
+      context: ./services/organization-service
+      dockerfile: Dockerfile
+      target: production
+    container_name: boardpilot-organization-service
+    env_file: ./services/organization-service/.env
+    environment:
+      NODE_ENV: production
+      PORT: 3003
+      SERVICE_NAME: organization-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD-SHELL", "curl -sf http://localhost:3003/health || exit 1"]
+
+  workspace-service:
+    <<: *service-defaults
+    build:
+      context: ./services/workspace-service
+      dockerfile: Dockerfile
+      target: production
+    container_name: boardpilot-workspace-service
+    env_file: ./services/workspace-service/.env
+    environment:
+      NODE_ENV: production
+      PORT: 3004
+      SERVICE_NAME: workspace-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD-SHELL", "curl -sf http://localhost:3004/health || exit 1"]
+
+  team-service:
+    <<: *service-defaults
+    build:
+      context: ./services/team-service
+      dockerfile: Dockerfile
+      target: production
+    container_name: boardpilot-team-service
+    env_file: ./services/team-service/.env
+    environment:
+      NODE_ENV: production
+      PORT: 3005
+      SERVICE_NAME: team-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD-SHELL", "curl -sf http://localhost:3005/health || exit 1"]
+
+  project-service:
+    <<: *service-defaults
+    build:
+      context: ./services/project-service
+      dockerfile: Dockerfile
+      target: production
+    container_name: boardpilot-project-service
+    env_file: ./services/project-service/.env
+    environment:
+      NODE_ENV: production
+      PORT: 3006
+      SERVICE_NAME: project-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD-SHELL", "curl -sf http://localhost:3006/health || exit 1"]
+
+  sprint-service:
+    <<: *service-defaults
+    build:
+      context: ./services/sprint-service
+      dockerfile: Dockerfile
+      target: production
+    container_name: boardpilot-sprint-service
+    env_file: ./services/sprint-service/.env
+    environment:
+      NODE_ENV: production
+      PORT: 3007
+      SERVICE_NAME: sprint-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD-SHELL", "curl -sf http://localhost:3007/health || exit 1"]
+
+  board-service:
+    <<: *service-defaults
+    build:
+      context: ./services/board-service
+      dockerfile: Dockerfile
+      target: production
+    container_name: boardpilot-board-service
+    env_file: ./services/board-service/.env
+    environment:
+      NODE_ENV: production
+      PORT: 3008
+      SERVICE_NAME: board-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD-SHELL", "curl -sf http://localhost:3008/health || exit 1"]
+
+  task-service:
+    <<: *service-defaults
+    build:
+      context: ./services/task-service
+      dockerfile: Dockerfile
+      target: production
+    container_name: boardpilot-task-service
+    env_file: ./services/task-service/.env
+    environment:
+      NODE_ENV: production
+      PORT: 3009
+      SERVICE_NAME: task-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD-SHELL", "curl -sf http://localhost:3009/health || exit 1"]
+
+  notification-service:
+    <<: *service-defaults
+    build:
+      context: ./services/notification-service
+      dockerfile: Dockerfile
+      target: production
+    container_name: boardpilot-notification-service
+    env_file: ./services/notification-service/.env
+    environment:
+      NODE_ENV: production
+      PORT: 3010
+      SERVICE_NAME: notification-service
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD-SHELL", "curl -sf http://localhost:3010/health || exit 1"]
+
+  comment-service:
+    <<: *service-defaults
+    build:
+      context: ./services/comment-service
+      dockerfile: Dockerfile
+      target: production
+    container_name: boardpilot-comment-service
+    env_file: ./services/comment-service/.env
+    environment:
+      NODE_ENV: production
+      PORT: 3011
+      SERVICE_NAME: comment-service
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD-SHELL", "curl -sf http://localhost:3011/health || exit 1"]
+
+  document-service:
+    <<: *service-defaults
+    build:
+      context: ./services/document-service
+      dockerfile: Dockerfile
+      target: production
+    container_name: boardpilot-document-service
+    env_file: ./services/document-service/.env
+    environment:
+      NODE_ENV: production
+      PORT: 3012
+      SERVICE_NAME: document-service
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD-SHELL", "curl -sf http://localhost:3012/health || exit 1"]
+
+  search-service:
+    <<: *service-defaults
+    build:
+      context: ./services/search-service
+      dockerfile: Dockerfile
+      target: production
+    container_name: boardpilot-search-service
+    env_file: ./services/search-service/.env
+    environment:
+      NODE_ENV: production
+      PORT: 3013
+      SERVICE_NAME: search-service
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD-SHELL", "curl -sf http://localhost:3013/health || exit 1"]
+
+  file-service:
+    <<: *service-defaults
+    build:
+      context: ./services/file-service
+      dockerfile: Dockerfile
+      target: production
+    container_name: boardpilot-file-service
+    env_file: ./services/file-service/.env
+    environment:
+      NODE_ENV: production
+      PORT: 3014
+      SERVICE_NAME: file-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD-SHELL", "curl -sf http://localhost:3014/health || exit 1"]
+
+  report-service:
+    <<: *service-defaults
+    build:
+      context: ./services/report-service
+      dockerfile: Dockerfile
+      target: production
+    container_name: boardpilot-report-service
+    env_file: ./services/report-service/.env
+    environment:
+      NODE_ENV: production
+      PORT: 3015
+      SERVICE_NAME: report-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD-SHELL", "curl -sf http://localhost:3015/health || exit 1"]
+
+  time-tracking-service:
+    <<: *service-defaults
+    build:
+      context: ./services/time-tracking-service
+      dockerfile: Dockerfile
+      target: production
+    container_name: boardpilot-time-tracking-service
+    env_file: ./services/time-tracking-service/.env
+    environment:
+      NODE_ENV: production
+      PORT: 3016
+      SERVICE_NAME: time-tracking-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD-SHELL", "curl -sf http://localhost:3016/health || exit 1"]
+
+  automation-service:
+    <<: *service-defaults
+    build:
+      context: ./services/automation-service
+      dockerfile: Dockerfile
+      target: production
+    container_name: boardpilot-automation-service
+    env_file: ./services/automation-service/.env
+    environment:
+      NODE_ENV: production
+      PORT: 3017
+      SERVICE_NAME: automation-service
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD-SHELL", "curl -sf http://localhost:3017/health || exit 1"]
+
+  ai-service:
+    <<: *service-defaults
+    build:
+      context: ./services/ai-service
+      dockerfile: Dockerfile
+      target: production
+    container_name: boardpilot-ai-service
+    env_file: ./services/ai-service/.env
+    environment:
+      NODE_ENV: production
+      PORT: 3018
+      SERVICE_NAME: ai-service
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD-SHELL", "curl -sf http://localhost:3018/health || exit 1"]
+
+  audit-service:
+    <<: *service-defaults
+    build:
+      context: ./services/audit-service
+      dockerfile: Dockerfile
+      target: production
+    container_name: boardpilot-audit-service
+    env_file: ./services/audit-service/.env
+    environment:
+      NODE_ENV: production
+      PORT: 3019
+      SERVICE_NAME: audit-service
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD-SHELL", "curl -sf http://localhost:3019/health || exit 1"]
+
+  billing-service:
+    <<: *service-defaults
+    build:
+      context: ./services/billing-service
+      dockerfile: Dockerfile
+      target: production
+    container_name: boardpilot-billing-service
+    env_file: ./services/billing-service/.env
+    environment:
+      NODE_ENV: production
+      PORT: 3020
+      SERVICE_NAME: billing-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD-SHELL", "curl -sf http://localhost:3020/health || exit 1"]
+
+networks:
+  boardpilot:
+    driver: bridge
+    name: boardpilot-network
+
+volumes:
+  postgres_data:
+  mongodb_data:
+  redis_data:
+  elasticsearch_data:
+  rabbitmq_data:
+  prometheus_data:
+  grafana_data:
