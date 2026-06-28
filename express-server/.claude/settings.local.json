@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(foreach \\($svc in Get-ChildItem \"D:/GitHub/work-board-copilot/express-server/services/\"\\) { $count = \\(Get-ChildItem -Recurse $svc.FullName -File\\).Count; if \\($count -gt 0\\) { \"$\\($svc.Name\\): $count files\" } })"
+    ]
+  }
+}
