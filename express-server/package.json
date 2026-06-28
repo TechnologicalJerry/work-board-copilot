@@ -1,0 +1,33 @@
+{
+  "name": "boardpilot-ai",
+  "version": "1.0.0",
+  "description": "BoardPilot AI - Enterprise Agile Project Management Platform",
+  "private": true,
+  "workspaces": [
+    "shared/packages/*",
+    "services/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "test": "npm run test --workspaces",
+    "lint": "npm run lint --workspaces",
+    "dev": "docker-compose -f docker-compose.dev.yml up",
+    "up": "docker-compose up -d",
+    "down": "docker-compose down",
+    "migrate": "npm run migrate --workspaces --if-present",
+    "seed": "npm run seed --workspaces --if-present",
+    "clean": "npm run clean --workspaces --if-present"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.3",
+    "eslint": "^8.56.0",
+    "@typescript-eslint/eslint-plugin": "^6.19.0",
+    "@typescript-eslint/parser": "^6.19.0",
+    "prettier": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  }
+}
