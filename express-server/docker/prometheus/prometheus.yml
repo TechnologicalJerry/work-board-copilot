@@ -1,0 +1,136 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    env: 'production'
+    application: 'boardpilot-ai'
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+
+rule_files: []
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'api-gateway'
+    static_configs:
+      - targets: ['api-gateway:3000']
+    metrics_path: /metrics
+
+  - job_name: 'identity-service'
+    static_configs:
+      - targets: ['identity-service:3001']
+    metrics_path: /metrics
+
+  - job_name: 'user-service'
+    static_configs:
+      - targets: ['user-service:3002']
+    metrics_path: /metrics
+
+  - job_name: 'organization-service'
+    static_configs:
+      - targets: ['organization-service:3003']
+    metrics_path: /metrics
+
+  - job_name: 'workspace-service'
+    static_configs:
+      - targets: ['workspace-service:3004']
+    metrics_path: /metrics
+
+  - job_name: 'team-service'
+    static_configs:
+      - targets: ['team-service:3005']
+    metrics_path: /metrics
+
+  - job_name: 'project-service'
+    static_configs:
+      - targets: ['project-service:3006']
+    metrics_path: /metrics
+
+  - job_name: 'sprint-service'
+    static_configs:
+      - targets: ['sprint-service:3007']
+    metrics_path: /metrics
+
+  - job_name: 'board-service'
+    static_configs:
+      - targets: ['board-service:3008']
+    metrics_path: /metrics
+
+  - job_name: 'task-service'
+    static_configs:
+      - targets: ['task-service:3009']
+    metrics_path: /metrics
+
+  - job_name: 'notification-service'
+    static_configs:
+      - targets: ['notification-service:3010']
+    metrics_path: /metrics
+
+  - job_name: 'comment-service'
+    static_configs:
+      - targets: ['comment-service:3011']
+    metrics_path: /metrics
+
+  - job_name: 'document-service'
+    static_configs:
+      - targets: ['document-service:3012']
+    metrics_path: /metrics
+
+  - job_name: 'search-service'
+    static_configs:
+      - targets: ['search-service:3013']
+    metrics_path: /metrics
+
+  - job_name: 'file-service'
+    static_configs:
+      - targets: ['file-service:3014']
+    metrics_path: /metrics
+
+  - job_name: 'report-service'
+    static_configs:
+      - targets: ['report-service:3015']
+    metrics_path: /metrics
+
+  - job_name: 'time-tracking-service'
+    static_configs:
+      - targets: ['time-tracking-service:3016']
+    metrics_path: /metrics
+
+  - job_name: 'automation-service'
+    static_configs:
+      - targets: ['automation-service:3017']
+    metrics_path: /metrics
+
+  - job_name: 'ai-service'
+    static_configs:
+      - targets: ['ai-service:3018']
+    metrics_path: /metrics
+
+  - job_name: 'audit-service'
+    static_configs:
+      - targets: ['audit-service:3019']
+    metrics_path: /metrics
+
+  - job_name: 'billing-service'
+    static_configs:
+      - targets: ['billing-service:3020']
+    metrics_path: /metrics
+
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres:5432']
+
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis:6379']
+
+  - job_name: 'rabbitmq'
+    static_configs:
+      - targets: ['rabbitmq:15692']
+    metrics_path: /metrics
