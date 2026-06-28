@@ -1,0 +1,145 @@
+version: '3.9'
+
+# Development override — mounts source code and uses ts-node-dev for hot reload
+
+x-dev-service: &dev-service
+  restart: unless-stopped
+  networks:
+    - boardpilot
+  volumes:
+    - ./shared:/app/shared
+  environment:
+    NODE_ENV: development
+    LOG_LEVEL: debug
+
+services:
+  # Infrastructure (same as production)
+  postgres:
+    extends:
+      file: docker-compose.yml
+      service: postgres
+    ports:
+      - "5432:5432"
+
+  mongodb:
+    extends:
+      file: docker-compose.yml
+      service: mongodb
+    ports:
+      - "27017:27017"
+
+  redis:
+    extends:
+      file: docker-compose.yml
+      service: redis
+    ports:
+      - "6379:6379"
+
+  elasticsearch:
+    extends:
+      file: docker-compose.yml
+      service: elasticsearch
+    ports:
+      - "9200:9200"
+
+  rabbitmq:
+    extends:
+      file: docker-compose.yml
+      service: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+  prometheus:
+    extends:
+      file: docker-compose.yml
+      service: prometheus
+
+  grafana:
+    extends:
+      file: docker-compose.yml
+      service: grafana
+
+  jaeger:
+    extends:
+      file: docker-compose.yml
+      service: jaeger
+
+  # Services in dev mode (hot reload)
+  api-gateway:
+    <<: *dev-service
+    build:
+      context: ./services/api-gateway
+      dockerfile: Dockerfile
+      target: development
+    env_file: ./services/api-gateway/.env
+    environment:
+      PORT: 3000
+      SERVICE_NAME: api-gateway
+    volumes:
+      - ./services/api-gateway:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+
+  identity-service:
+    <<: *dev-service
+    build:
+      context: ./services/identity-service
+      dockerfile: Dockerfile
+      target: development
+    env_file: ./services/identity-service/.env
+    environment:
+      PORT: 3001
+      SERVICE_NAME: identity-service
+    volumes:
+      - ./services/identity-service:/app
+      - /app/node_modules
+    ports:
+      - "3001:3001"
+
+  user-service:
+    <<: *dev-service
+    build:
+      context: ./services/user-service
+      dockerfile: Dockerfile
+      target: development
+    env_file: ./services/user-service/.env
+    environment:
+      PORT: 3002
+      SERVICE_NAME: user-service
+    volumes:
+      - ./services/user-service:/app
+      - /app/node_modules
+    ports:
+      - "3002:3002"
+
+  organization-service:
+    <<: *dev-service
+    build:
+      context: ./services/organization-service
+      dockerfile: Dockerfile
+      target: development
+    env_file: ./services/organization-service/.env
+    environment:
+      PORT: 3003
+      SERVICE_NAME: organization-service
+    volumes:
+      - ./services/organization-service:/app
+      - /app/node_modules
+    ports:
+      - "3003:3003"
+
+networks:
+  boardpilot:
+    driver: bridge
+    name: boardpilot-network
+
+volumes:
+  postgres_data:
+  mongodb_data:
+  redis_data:
+  elasticsearch_data:
+  rabbitmq_data:
+  prometheus_data:
+  grafana_data:
