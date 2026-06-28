@@ -1,0 +1,401 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [main, develop, 'release/**', 'feature/**']
+  pull_request:
+    branches: [main, develop]
+
+env:
+  NODE_VERSION: '20.x'
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository_owner }}/boardpilot
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ============================================================
+  # Detect changed services
+  # ============================================================
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      api-gateway: ${{ steps.filter.outputs.api-gateway }}
+      identity-service: ${{ steps.filter.outputs.identity-service }}
+      user-service: ${{ steps.filter.outputs.user-service }}
+      organization-service: ${{ steps.filter.outputs.organization-service }}
+      workspace-service: ${{ steps.filter.outputs.workspace-service }}
+      team-service: ${{ steps.filter.outputs.team-service }}
+      project-service: ${{ steps.filter.outputs.project-service }}
+      sprint-service: ${{ steps.filter.outputs.sprint-service }}
+      board-service: ${{ steps.filter.outputs.board-service }}
+      task-service: ${{ steps.filter.outputs.task-service }}
+      notification-service: ${{ steps.filter.outputs.notification-service }}
+      comment-service: ${{ steps.filter.outputs.comment-service }}
+      document-service: ${{ steps.filter.outputs.document-service }}
+      search-service: ${{ steps.filter.outputs.search-service }}
+      file-service: ${{ steps.filter.outputs.file-service }}
+      report-service: ${{ steps.filter.outputs.report-service }}
+      time-tracking-service: ${{ steps.filter.outputs.time-tracking-service }}
+      automation-service: ${{ steps.filter.outputs.automation-service }}
+      ai-service: ${{ steps.filter.outputs.ai-service }}
+      audit-service: ${{ steps.filter.outputs.audit-service }}
+      billing-service: ${{ steps.filter.outputs.billing-service }}
+      shared: ${{ steps.filter.outputs.shared }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            api-gateway:
+              - 'services/api-gateway/**'
+            identity-service:
+              - 'services/identity-service/**'
+            user-service:
+              - 'services/user-service/**'
+            organization-service:
+              - 'services/organization-service/**'
+            workspace-service:
+              - 'services/workspace-service/**'
+            team-service:
+              - 'services/team-service/**'
+            project-service:
+              - 'services/project-service/**'
+            sprint-service:
+              - 'services/sprint-service/**'
+            board-service:
+              - 'services/board-service/**'
+            task-service:
+              - 'services/task-service/**'
+            notification-service:
+              - 'services/notification-service/**'
+            comment-service:
+              - 'services/comment-service/**'
+            document-service:
+              - 'services/document-service/**'
+            search-service:
+              - 'services/search-service/**'
+            file-service:
+              - 'services/file-service/**'
+            report-service:
+              - 'services/report-service/**'
+            time-tracking-service:
+              - 'services/time-tracking-service/**'
+            automation-service:
+              - 'services/automation-service/**'
+            ai-service:
+              - 'services/ai-service/**'
+            audit-service:
+              - 'services/audit-service/**'
+            billing-service:
+              - 'services/billing-service/**'
+            shared:
+              - 'shared/**'
+
+  # ============================================================
+  # Shared packages lint & build
+  # ============================================================
+  shared-build:
+    name: Build Shared Packages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci --workspaces --include-workspace-root
+      - name: Build shared packages
+        run: |
+          cd shared/packages/types && npm run build
+          cd ../../..
+          cd shared/packages/errors && npm run build
+          cd ../../..
+          cd shared/packages/logger && npm run build
+          cd ../../..
+          cd shared/packages/common && npm run build
+          cd ../../..
+          cd shared/packages/config && npm run build
+          cd ../../..
+          cd shared/packages/events && npm run build
+          cd ../../..
+          cd shared/packages/middlewares && npm run build
+          cd ../../..
+          cd shared/packages/validation && npm run build
+      - name: Upload shared artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: shared-packages
+          path: shared/packages/*/dist
+          retention-days: 1
+
+  # ============================================================
+  # Per-service test matrix
+  # ============================================================
+  test-service:
+    name: Test ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    needs: [changes, shared-build]
+    if: |
+      needs.changes.outputs.shared == 'true' ||
+      needs.changes.outputs[matrix.service] == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - api-gateway
+          - identity-service
+          - user-service
+          - organization-service
+          - workspace-service
+          - team-service
+          - project-service
+          - sprint-service
+          - board-service
+          - task-service
+          - notification-service
+          - comment-service
+          - document-service
+          - search-service
+          - file-service
+          - report-service
+          - time-tracking-service
+          - automation-service
+          - ai-service
+          - audit-service
+          - billing-service
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_USER: test_user
+          POSTGRES_DB: test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      mongodb:
+        image: mongo:7-jammy
+        env:
+          MONGO_INITDB_ROOT_USERNAME: test_user
+          MONGO_INITDB_ROOT_PASSWORD: test_password
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --eval 'db.adminCommand(\"ping\")'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Download shared artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: shared-packages
+          path: shared/packages
+
+      - name: Install service dependencies
+        run: |
+          npm ci --workspace=services/${{ matrix.service }}
+
+      - name: Type check
+        run: |
+          cd services/${{ matrix.service }}
+          npx tsc --noEmit
+
+      - name: Lint
+        run: |
+          cd services/${{ matrix.service }}
+          npm run lint --if-present
+
+      - name: Run Prisma migrations (if applicable)
+        run: |
+          cd services/${{ matrix.service }}
+          if [ -f prisma/schema.prisma ]; then
+            npx prisma migrate deploy
+          fi
+        env:
+          DATABASE_URL: postgresql://test_user:test_password@localhost:5432/test_db
+
+      - name: Run tests
+        run: |
+          cd services/${{ matrix.service }}
+          npm test -- --coverage --coverageReporters=lcov
+        env:
+          NODE_ENV: test
+          DATABASE_URL: postgresql://test_user:test_password@localhost:5432/test_db
+          MONGODB_URI: mongodb://test_user:test_password@localhost:27017/test_db?authSource=admin
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+          JWT_ACCESS_SECRET: test-jwt-access-secret-32-characters
+          JWT_REFRESH_SECRET: test-jwt-refresh-secret-32-characters
+          ENCRYPTION_KEY: test-encryption-key-32-characters!
+          RABBITMQ_URL: amqp://guest:guest@localhost:5672
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          files: services/${{ matrix.service }}/coverage/lcov.info
+          flags: ${{ matrix.service }}
+          fail_ci_if_error: false
+
+  # ============================================================
+  # Build & push Docker images
+  # ============================================================
+  build-push:
+    name: Build & Push ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    needs: [test-service]
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - api-gateway
+          - identity-service
+          - user-service
+          - organization-service
+          - workspace-service
+          - team-service
+          - project-service
+          - sprint-service
+          - board-service
+          - task-service
+          - notification-service
+          - comment-service
+          - document-service
+          - search-service
+          - file-service
+          - report-service
+          - time-tracking-service
+          - automation-service
+          - ai-service
+          - audit-service
+          - billing-service
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-${{ matrix.service }}
+          tags: |
+            type=sha,prefix={{branch}}-
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: services/${{ matrix.service }}
+          target: production
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+          build-args: |
+            SERVICE_NAME=${{ matrix.service }}
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+            VCS_REF=${{ github.sha }}
+
+  # ============================================================
+  # Deploy to staging
+  # ============================================================
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [build-push]
+    if: github.ref == 'refs/heads/develop'
+    environment: staging
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.29.0'
+
+      - name: Configure kubeconfig
+        run: |
+          echo "${{ secrets.KUBE_CONFIG_STAGING }}" | base64 -d > ~/.kube/config
+
+      - name: Deploy to staging
+        run: |
+          kubectl apply -k kubernetes/overlays/staging/
+          kubectl rollout status deployment --all -n boardpilot-staging --timeout=300s
+
+  # ============================================================
+  # Deploy to production
+  # ============================================================
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [build-push]
+    if: github.ref == 'refs/heads/main'
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.29.0'
+
+      - name: Configure kubeconfig
+        run: |
+          echo "${{ secrets.KUBE_CONFIG_PRODUCTION }}" | base64 -d > ~/.kube/config
+
+      - name: Deploy to production
+        run: |
+          kubectl apply -k kubernetes/overlays/prod/
+          kubectl rollout status deployment --all -n boardpilot-production --timeout=600s
