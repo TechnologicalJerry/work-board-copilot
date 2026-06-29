@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: boardpilot
+  labels:
+    app.kubernetes.io/name: boardpilot
+    app.kubernetes.io/part-of: boardpilot-ai
