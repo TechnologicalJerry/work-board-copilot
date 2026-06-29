@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: boardpilot-config
+  namespace: boardpilot
+data:
+  NODE_ENV: "production"
+  LOG_LEVEL: "info"
+  REDIS_HOST: "redis-service"
+  REDIS_PORT: "6379"
+  RABBITMQ_URL: "amqp://boardpilot:$(RABBITMQ_PASSWORD)@rabbitmq-service:5672"
+  POSTGRES_HOST: "postgres-service"
+  POSTGRES_PORT: "5432"
+  MONGODB_HOST: "mongodb-service"
+  MONGODB_PORT: "27017"
+  ELASTICSEARCH_NODE: "http://elasticsearch-service:9200"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://jaeger-service:4317"
+  ALLOWED_ORIGINS: "https://app.boardpilot.ai,https://boardpilot.ai"
+  RATE_LIMIT_WINDOW_MS: "900000"
+  RATE_LIMIT_MAX_REQUESTS: "100"
+  JWT_ACCESS_EXPIRY: "15m"
+  JWT_REFRESH_EXPIRY: "7d"
+  FRONTEND_URL: "https://app.boardpilot.ai"
+  MFA_APP_NAME: "BoardPilot AI"
+  OPENAI_MODEL: "gpt-4-turbo-preview"
+  AWS_REGION: "us-east-1"
