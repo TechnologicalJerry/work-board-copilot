@@ -1,0 +1,1435 @@
+openapi: 3.0.3
+info:
+  title: BoardPilot AI API Gateway
+  description: |
+    Central API Gateway for the BoardPilot AI platform.
+
+    All client requests are routed through this gateway, which handles:
+    - JWT authentication validation
+    - Rate limiting
+    - Circuit breaking
+    - Request correlation
+    - Proxy to 20 downstream microservices
+
+    ## Authentication
+    Most endpoints require a Bearer JWT access token obtained from the Identity Service (`POST /api/v1/auth/login`).
+
+    ## Rate Limits
+    | Tier | Limit | Window |
+    |------|-------|--------|
+    | Global | 100 req | 15 min (per IP) |
+    | Auth endpoints | 20 req | 15 min (per IP) |
+    | Sensitive endpoints | 5 req | 1 min (per IP) |
+    | Authenticated users | 1000 req | 15 min (per user) |
+
+  version: 1.0.0
+  contact:
+    name: BoardPilot Engineering
+    email: engineering@boardpilot.ai
+  license:
+    name: Proprietary
+
+servers:
+  - url: http://localhost:3000
+    description: Local development
+  - url: https://api.boardpilot.ai
+    description: Production
+
+tags:
+  - name: Gateway
+    description: API Gateway health and metadata endpoints
+  - name: Identity
+    description: Authentication and session management (proxied to identity-service)
+  - name: Users
+    description: User profile management (proxied to user-service)
+  - name: Organizations
+    description: Organization management (proxied to organization-service)
+  - name: Workspaces
+    description: Workspace management (proxied to workspace-service)
+  - name: Projects
+    description: Project management (proxied to project-service)
+  - name: Tasks
+    description: Task management (proxied to task-service)
+  - name: Sprints
+    description: Sprint / iteration management (proxied to sprint-service)
+  - name: Boards
+    description: Kanban and Scrum board views (proxied to board-service)
+  - name: Comments
+    description: Comments and threads (proxied to comment-service)
+  - name: Notifications
+    description: In-app and push notifications (proxied to notification-service)
+  - name: Audit
+    description: Audit log trail (proxied to audit-service)
+  - name: Billing
+    description: Subscription and billing management (proxied to billing-service)
+  - name: Analytics
+    description: Usage and performance analytics (proxied to analytics-service)
+  - name: Search
+    description: Full-text search across all entities (proxied to search-service)
+  - name: Files
+    description: File and attachment management (proxied to file-service)
+  - name: AI
+    description: AI-powered features and recommendations (proxied to ai-service)
+  - name: Webhooks
+    description: Outbound webhook management (proxied to webhook-service)
+  - name: Integrations
+    description: Third-party integrations (proxied to integration-service)
+  - name: Reports
+    description: Report generation and export (proxied to report-service)
+  - name: Realtime
+    description: Real-time collaboration events (proxied to realtime-service)
+
+security:
+  - BearerAuth: []
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT access token obtained from `POST /api/v1/auth/login`.
+        Tokens expire after 15 minutes. Use `POST /api/v1/auth/refresh` to rotate.
+
+  schemas:
+    ApiResponse:
+      type: object
+      required:
+        - success
+        - requestId
+        - timestamp
+      properties:
+        success:
+          type: boolean
+          description: Whether the request succeeded
+        data:
+          description: Response payload (present on success)
+        error:
+          $ref: '#/components/schemas/ApiError'
+        meta:
+          $ref: '#/components/schemas/ApiMeta'
+        requestId:
+          type: string
+          format: uuid
+          description: Unique ID for this request
+        timestamp:
+          type: string
+          format: date-time
+
+    ApiError:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          description: Machine-readable error code
+          example: VALIDATION_ERROR
+        message:
+          type: string
+          description: Human-readable error description
+          example: Validation failed
+        details:
+          type: object
+          additionalProperties: true
+          description: Field-level error details
+
+    ApiMeta:
+      type: object
+      properties:
+        pagination:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    PaginationMeta:
+      type: object
+      required:
+        - page
+        - limit
+        - total
+        - totalPages
+        - hasNextPage
+        - hasPrevPage
+      properties:
+        page:
+          type: integer
+          minimum: 1
+          example: 1
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+          example: 20
+        total:
+          type: integer
+          minimum: 0
+          example: 150
+        totalPages:
+          type: integer
+          minimum: 0
+          example: 8
+        hasNextPage:
+          type: boolean
+          example: true
+        hasPrevPage:
+          type: boolean
+          example: false
+
+    ErrorResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            success:
+              type: boolean
+              enum: [false]
+            error:
+              $ref: '#/components/schemas/ApiError'
+
+    ServiceHealth:
+      type: object
+      required:
+        - status
+        - service
+        - version
+        - uptime
+        - timestamp
+        - checks
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+          description: Aggregate service health status
+        service:
+          type: string
+          description: Service name
+          example: api-gateway
+        version:
+          type: string
+          description: Service version
+          example: 1.0.0
+        uptime:
+          type: integer
+          description: Seconds since service started
+          example: 3600
+        timestamp:
+          type: string
+          format: date-time
+        checks:
+          type: array
+          items:
+            $ref: '#/components/schemas/HealthCheck'
+
+    HealthCheck:
+      type: object
+      required:
+        - name
+        - status
+        - duration
+      properties:
+        name:
+          type: string
+          description: Name of the checked dependency
+          example: identity-service
+        status:
+          type: string
+          enum: [pass, warn, fail]
+        duration:
+          type: integer
+          description: Time taken for the check in milliseconds
+          example: 42
+        message:
+          type: string
+          description: Optional human-readable message (especially useful on failure)
+          example: Connection timed out after 2000ms
+
+  parameters:
+    ServiceNameParam:
+      name: serviceName
+      in: path
+      required: true
+      schema:
+        type: string
+        enum:
+          - identity-service
+          - user-service
+          - organization-service
+          - workspace-service
+          - project-service
+          - task-service
+          - sprint-service
+          - board-service
+          - comment-service
+          - notification-service
+          - audit-service
+          - billing-service
+          - analytics-service
+          - search-service
+          - file-service
+          - ai-service
+          - webhook-service
+          - integration-service
+          - report-service
+          - realtime-service
+      description: The name of the downstream service to probe
+
+  responses:
+    UnauthorizedError:
+      description: Missing or invalid JWT token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            success: false
+            error:
+              code: UNAUTHORIZED
+              message: Missing or invalid Authorization header
+            requestId: 550e8400-e29b-41d4-a716-446655440000
+            timestamp: '2024-01-15T10:30:00.000Z'
+
+    ForbiddenError:
+      description: Authenticated but insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            success: false
+            error:
+              code: FORBIDDEN
+              message: Missing required permissions
+            requestId: 550e8400-e29b-41d4-a716-446655440001
+            timestamp: '2024-01-15T10:30:00.000Z'
+
+    NotFoundError:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    TooManyRequestsError:
+      description: Rate limit exceeded
+      headers:
+        X-RateLimit-Limit:
+          description: Request limit per window
+          schema:
+            type: integer
+        X-RateLimit-Remaining:
+          description: Remaining requests in current window
+          schema:
+            type: integer
+        X-RateLimit-Reset:
+          description: UTC epoch seconds when the window resets
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    GatewayError:
+      description: Gateway-level error (bad gateway, timeout, service unavailable)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+paths:
+  # ─── Gateway Health ──────────────────────────────────────────────────────────
+
+  /health:
+    get:
+      tags:
+        - Gateway
+      summary: Aggregate gateway health
+      description: |
+        Probes all 20 downstream services and returns an aggregate health report.
+        Responses:
+        - **200**: All services healthy
+        - **207**: Partial — some services degraded
+        - **503**: One or more services failing
+      security: []
+      responses:
+        '200':
+          description: All downstream services healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceHealth'
+        '207':
+          description: Degraded — some services healthy, some with warnings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceHealth'
+        '503':
+          description: One or more downstream services failing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceHealth'
+
+  /health/internal:
+    get:
+      tags:
+        - Gateway
+      summary: Internal gateway health (no downstream probes)
+      description: |
+        Returns the health of the gateway process itself — memory, circuit breakers —
+        without probing downstream services. Fast and side-effect free.
+      security: []
+      responses:
+        '200':
+          description: Gateway process healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceHealth'
+        '503':
+          description: Gateway process unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceHealth'
+
+  /health/services/{serviceName}:
+    get:
+      tags:
+        - Gateway
+      summary: Individual downstream service health probe
+      description: |
+        Probes a single downstream service's /health endpoint with a 2-second timeout
+        and returns both the health result and the circuit breaker state.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/ServiceNameParam'
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceHealth'
+        '207':
+          description: Service is degraded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceHealth'
+        '404':
+          description: Unknown service name
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceHealth'
+        '503':
+          description: Service is unhealthy or unreachable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceHealth'
+
+  # ─── Identity Service ────────────────────────────────────────────────────────
+
+  /api/v1/auth/{path}:
+    parameters:
+      - name: path
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Path forwarded to identity-service
+    get:
+      tags: [Identity]
+      summary: Identity service — GET
+      description: Proxied to identity-service. Includes login, logout, token refresh, OAuth, MFA.
+      security:
+        - {}
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Proxied response from identity-service
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '429':
+          $ref: '#/components/responses/TooManyRequestsError'
+        '502':
+          $ref: '#/components/responses/GatewayError'
+    post:
+      tags: [Identity]
+      summary: Identity service — POST
+      description: |
+        Key endpoints:
+        - `POST /api/v1/auth/login` — Email/password login
+        - `POST /api/v1/auth/register` — New account registration
+        - `POST /api/v1/auth/refresh` — Rotate access token
+        - `POST /api/v1/auth/logout` — Invalidate session
+        - `POST /api/v1/auth/forgot-password` — Initiate password reset
+        - `POST /api/v1/auth/reset-password` — Complete password reset
+        - `POST /api/v1/auth/mfa/enable` — Enable MFA
+        - `POST /api/v1/auth/mfa/verify` — Verify MFA code
+      security:
+        - {}
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Proxied response from identity-service
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '429':
+          $ref: '#/components/responses/TooManyRequestsError'
+        '502':
+          $ref: '#/components/responses/GatewayError'
+    put:
+      tags: [Identity]
+      summary: Identity service — PUT
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Proxied response from identity-service
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+    patch:
+      tags: [Identity]
+      summary: Identity service — PATCH
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Proxied response from identity-service
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+    delete:
+      tags: [Identity]
+      summary: Identity service — DELETE
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Proxied response from identity-service
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  # ─── User Service ─────────────────────────────────────────────────────────────
+
+  /api/v1/users/{path}:
+    parameters:
+      - name: path
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Users]
+      summary: User service — GET
+      description: |
+        Key endpoints:
+        - `GET /api/v1/users/me` — Current user profile
+        - `GET /api/v1/users/:id` — Get user by ID
+        - `GET /api/v1/users` — List users (admin)
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Proxied response from user-service
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+    post:
+      tags: [Users]
+      summary: User service — POST
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '201':
+          description: Proxied response from user-service
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+    put:
+      tags: [Users]
+      summary: User service — PUT
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Proxied response from user-service
+    patch:
+      tags: [Users]
+      summary: User service — PATCH
+      description: |
+        Key endpoints:
+        - `PATCH /api/v1/users/me` — Update current user profile
+        - `PATCH /api/v1/users/:id/avatar` — Upload avatar
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Proxied response from user-service
+    delete:
+      tags: [Users]
+      summary: User service — DELETE
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: Deleted successfully
+
+  # ─── Organizations ────────────────────────────────────────────────────────────
+
+  /api/v1/organizations/{path}:
+    parameters:
+      - name: path
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Organizations]
+      summary: Organization service — GET
+      description: Manage organizations, members, and invitations.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Proxied response from organization-service
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+    post:
+      tags: [Organizations]
+      summary: Organization service — POST
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '201':
+          description: Proxied response from organization-service
+    patch:
+      tags: [Organizations]
+      summary: Organization service — PATCH
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Proxied response from organization-service
+    delete:
+      tags: [Organizations]
+      summary: Organization service — DELETE
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: Deleted successfully
+
+  # ─── Workspaces ───────────────────────────────────────────────────────────────
+
+  /api/v1/workspaces/{path}:
+    parameters:
+      - name: path
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Workspaces]
+      summary: Workspace service — GET
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Proxied response from workspace-service
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+    post:
+      tags: [Workspaces]
+      summary: Workspace service — POST
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '201':
+          description: Proxied response from workspace-service
+    patch:
+      tags: [Workspaces]
+      summary: Workspace service — PATCH
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Proxied response from workspace-service
+    delete:
+      tags: [Workspaces]
+      summary: Workspace service — DELETE
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: Deleted successfully
+
+  # ─── Projects ─────────────────────────────────────────────────────────────────
+
+  /api/v1/projects/{path}:
+    parameters:
+      - name: path
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Projects]
+      summary: Project service — GET
+      description: |
+        Key endpoints:
+        - `GET /api/v1/projects` — List workspace projects
+        - `GET /api/v1/projects/:id` — Get project details
+        - `GET /api/v1/projects/:id/members` — List project members
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Proxied response from project-service
+    post:
+      tags: [Projects]
+      summary: Project service — POST
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '201':
+          description: Proxied response from project-service
+    patch:
+      tags: [Projects]
+      summary: Project service — PATCH
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Proxied response from project-service
+    delete:
+      tags: [Projects]
+      summary: Project service — DELETE
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: Deleted successfully
+
+  # ─── Tasks ────────────────────────────────────────────────────────────────────
+
+  /api/v1/tasks/{path}:
+    parameters:
+      - name: path
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Tasks]
+      summary: Task service — GET
+      description: |
+        Key endpoints:
+        - `GET /api/v1/tasks` — List tasks with filters
+        - `GET /api/v1/tasks/:id` — Get task details
+        - `GET /api/v1/tasks/:id/history` — Task change history
+        - `GET /api/v1/tasks/:id/subtasks` — List subtasks
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Proxied response from task-service
+    post:
+      tags: [Tasks]
+      summary: Task service — POST
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '201':
+          description: Proxied response from task-service
+    patch:
+      tags: [Tasks]
+      summary: Task service — PATCH
+      description: Update task status, assignee, priority, labels, etc.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Proxied response from task-service
+    delete:
+      tags: [Tasks]
+      summary: Task service — DELETE
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: Task deleted
+
+  # ─── Sprints ──────────────────────────────────────────────────────────────────
+
+  /api/v1/sprints/{path}:
+    parameters:
+      - name: path
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Sprints]
+      summary: Sprint service — GET
+      description: Manage sprints, backlog, and velocity metrics.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Proxied response from sprint-service
+    post:
+      tags: [Sprints]
+      summary: Sprint service — POST
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '201':
+          description: Proxied response from sprint-service
+    patch:
+      tags: [Sprints]
+      summary: Sprint service — PATCH
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Proxied response from sprint-service
+    delete:
+      tags: [Sprints]
+      summary: Sprint service — DELETE
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: Sprint deleted
+
+  # ─── Boards ───────────────────────────────────────────────────────────────────
+
+  /api/v1/boards/{path}:
+    parameters:
+      - name: path
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Boards]
+      summary: Board service — GET
+      description: Kanban and Scrum board views, columns, and swimlanes.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Proxied response from board-service
+    post:
+      tags: [Boards]
+      summary: Board service — POST
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '201':
+          description: Proxied response from board-service
+    patch:
+      tags: [Boards]
+      summary: Board service — PATCH
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Proxied response from board-service
+    delete:
+      tags: [Boards]
+      summary: Board service — DELETE
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: Board deleted
+
+  # ─── Comments ─────────────────────────────────────────────────────────────────
+
+  /api/v1/comments/{path}:
+    parameters:
+      - name: path
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Comments]
+      summary: Comment service — GET
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Proxied response from comment-service
+    post:
+      tags: [Comments]
+      summary: Comment service — POST
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '201':
+          description: Proxied response from comment-service
+    patch:
+      tags: [Comments]
+      summary: Comment service — PATCH
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Proxied response from comment-service
+    delete:
+      tags: [Comments]
+      summary: Comment service — DELETE
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: Comment deleted
+
+  # ─── Notifications ────────────────────────────────────────────────────────────
+
+  /api/v1/notifications/{path}:
+    parameters:
+      - name: path
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Notifications]
+      summary: Notification service — GET
+      description: List, read, and manage in-app notifications.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Proxied response from notification-service
+    post:
+      tags: [Notifications]
+      summary: Notification service — POST
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '201':
+          description: Proxied response from notification-service
+    patch:
+      tags: [Notifications]
+      summary: Notification service — PATCH (mark as read)
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Proxied response from notification-service
+    delete:
+      tags: [Notifications]
+      summary: Notification service — DELETE
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: Notification deleted
+
+  # ─── Audit ────────────────────────────────────────────────────────────────────
+
+  /api/v1/audit/{path}:
+    parameters:
+      - name: path
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Audit]
+      summary: Audit service — GET
+      description: Query the immutable audit trail. Admin-only.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Proxied response from audit-service
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+    post:
+      tags: [Audit]
+      summary: Audit service — POST (internal use)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '201':
+          description: Proxied response from audit-service
+
+  # ─── Billing ──────────────────────────────────────────────────────────────────
+
+  /api/v1/billing/{path}:
+    parameters:
+      - name: path
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Billing]
+      summary: Billing service — GET
+      description: |
+        Key endpoints:
+        - `GET /api/v1/billing/subscription` — Current subscription details
+        - `GET /api/v1/billing/invoices` — Invoice history
+        - `GET /api/v1/billing/usage` — Usage metering
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Proxied response from billing-service
+    post:
+      tags: [Billing]
+      summary: Billing service — POST
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Proxied response from billing-service
+    patch:
+      tags: [Billing]
+      summary: Billing service — PATCH
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Proxied response from billing-service
+    delete:
+      tags: [Billing]
+      summary: Billing service — DELETE
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Proxied response from billing-service
+
+  # ─── Analytics ────────────────────────────────────────────────────────────────
+
+  /api/v1/analytics/{path}:
+    parameters:
+      - name: path
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Analytics]
+      summary: Analytics service — GET
+      description: Velocity, burndown, cycle time, and custom analytics.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Proxied response from analytics-service
+    post:
+      tags: [Analytics]
+      summary: Analytics service — POST (custom queries)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Proxied response from analytics-service
+
+  # ─── Search ───────────────────────────────────────────────────────────────────
+
+  /api/v1/search/{path}:
+    parameters:
+      - name: path
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Search]
+      summary: Search service — GET
+      description: Full-text search across tasks, projects, comments, and users.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Proxied response from search-service
+    post:
+      tags: [Search]
+      summary: Search service — POST (complex queries)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Proxied response from search-service
+
+  # ─── Files ────────────────────────────────────────────────────────────────────
+
+  /api/v1/files/{path}:
+    parameters:
+      - name: path
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Files]
+      summary: File service — GET
+      description: Download files and get presigned upload URLs.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Proxied response from file-service
+    post:
+      tags: [Files]
+      summary: File service — POST (upload)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Proxied response from file-service
+    delete:
+      tags: [Files]
+      summary: File service — DELETE
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: File deleted
+
+  # ─── AI ───────────────────────────────────────────────────────────────────────
+
+  /api/v1/ai/{path}:
+    parameters:
+      - name: path
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [AI]
+      summary: AI service — GET
+      description: |
+        Key endpoints:
+        - `GET /api/v1/ai/suggestions` — AI task suggestions
+        - `GET /api/v1/ai/predictions` — Sprint completion predictions
+        - `GET /api/v1/ai/risk-analysis` — Risk analysis for sprints/projects
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Proxied response from ai-service
+    post:
+      tags: [AI]
+      summary: AI service — POST
+      description: |
+        Key endpoints:
+        - `POST /api/v1/ai/generate-description` — AI-generated task descriptions
+        - `POST /api/v1/ai/estimate` — AI effort estimation
+        - `POST /api/v1/ai/summarize` — Summarize activity / comments
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Proxied response from ai-service
+
+  # ─── Webhooks ─────────────────────────────────────────────────────────────────
+
+  /api/v1/webhooks/{path}:
+    parameters:
+      - name: path
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Webhooks]
+      summary: Webhook service — GET
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Proxied response from webhook-service
+    post:
+      tags: [Webhooks]
+      summary: Webhook service — POST
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '201':
+          description: Proxied response from webhook-service
+    patch:
+      tags: [Webhooks]
+      summary: Webhook service — PATCH
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Proxied response from webhook-service
+    delete:
+      tags: [Webhooks]
+      summary: Webhook service — DELETE
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: Webhook deleted
+
+  # ─── Integrations ─────────────────────────────────────────────────────────────
+
+  /api/v1/integrations/{path}:
+    parameters:
+      - name: path
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Integrations]
+      summary: Integration service — GET
+      description: GitHub, Jira, Slack, Google Workspace integrations.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Proxied response from integration-service
+    post:
+      tags: [Integrations]
+      summary: Integration service — POST
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '201':
+          description: Proxied response from integration-service
+    patch:
+      tags: [Integrations]
+      summary: Integration service — PATCH
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Proxied response from integration-service
+    delete:
+      tags: [Integrations]
+      summary: Integration service — DELETE
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: Integration disconnected
+
+  # ─── Reports ──────────────────────────────────────────────────────────────────
+
+  /api/v1/reports/{path}:
+    parameters:
+      - name: path
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Reports]
+      summary: Report service — GET
+      description: Download and list generated reports (PDF, CSV, Excel).
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Proxied response from report-service
+    post:
+      tags: [Reports]
+      summary: Report service — POST (generate report)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '202':
+          description: Report generation accepted
+    delete:
+      tags: [Reports]
+      summary: Report service — DELETE
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: Report deleted
+
+  # ─── Realtime ─────────────────────────────────────────────────────────────────
+
+  /api/v1/realtime/{path}:
+    parameters:
+      - name: path
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Realtime]
+      summary: Realtime service — GET
+      description: |
+        Handles WebSocket upgrades for real-time collaboration.
+        - `GET /api/v1/realtime/connect` — WebSocket upgrade endpoint
+        - `GET /api/v1/realtime/channels` — List active channels
+        - `GET /api/v1/realtime/presence/:channelId` — User presence
+      security:
+        - BearerAuth: []
+      responses:
+        '101':
+          description: Switching Protocols (WebSocket upgrade)
+        '200':
+          description: Proxied response from realtime-service
+    post:
+      tags: [Realtime]
+      summary: Realtime service — POST
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Proxied response from realtime-service
