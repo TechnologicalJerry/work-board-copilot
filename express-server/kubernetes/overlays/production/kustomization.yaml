@@ -1,0 +1,43 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: boardpilot
+
+resources:
+  - ../../base
+  - pdb.yaml
+
+commonLabels:
+  environment: production
+
+configMapGenerator:
+  - name: boardpilot-config
+    behavior: merge
+    literals:
+      - NODE_ENV=production
+      - LOG_LEVEL=warn
+      - ALLOWED_ORIGINS=https://api.boardpilot.ai,https://boardpilot.ai
+
+patches:
+  - target:
+      kind: Deployment
+      name: task-service
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 3
+  - target:
+      kind: Deployment
+      name: identity-service
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 3
+
+images:
+  - name: ghcr.io/boardpilot/api-gateway
+    newTag: latest
+  - name: ghcr.io/boardpilot/identity-service
+    newTag: latest
+  - name: ghcr.io/boardpilot/task-service
+    newTag: latest
