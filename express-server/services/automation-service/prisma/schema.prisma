@@ -1,0 +1,31 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model AutomationExecution {
+  id          String           @id @default(uuid())
+  ruleId      String
+  triggeredBy String
+  triggerData Json
+  status      AutomationStatus
+  actionsRun  Int              @default(0)
+  error       String?
+  duration    Int?
+  createdAt   DateTime         @default(now())
+
+  @@index([ruleId])
+  @@index([createdAt])
+  @@index([status])
+}
+
+enum AutomationStatus {
+  SUCCESS
+  PARTIAL
+  FAILED
+  SKIPPED
+}
