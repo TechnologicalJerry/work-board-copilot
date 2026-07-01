@@ -1,0 +1,127 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model BillingCustomer {
+  id               String   @id @default(uuid())
+  organizationId   String   @unique
+  stripeCustomerId String   @unique
+  email            String
+  name             String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  subscriptions  Subscription[]
+  invoices       Invoice[]
+  paymentMethods PaymentMethod[]
+}
+
+model Subscription {
+  id                   String             @id @default(uuid())
+  customerId           String
+  stripeSubscriptionId String             @unique
+  stripePriceId        String
+  plan                 PlanType
+  status               SubscriptionStatus
+  currentPeriodStart   DateTime
+  currentPeriodEnd     DateTime
+  cancelAtPeriodEnd    Boolean            @default(false)
+  cancelledAt          DateTime?
+  trialStart           DateTime?
+  trialEnd             DateTime?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  customer BillingCustomer @relation(fields: [customerId], references: [id])
+
+  @@index([customerId])
+  @@index([status])
+}
+
+enum PlanType {
+  FREE
+  STARTER
+  PROFESSIONAL
+  ENTERPRISE
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  TRIALING
+  PAST_DUE
+  CANCELLED
+  INCOMPLETE
+  INCOMPLETE_EXPIRED
+  PAUSED
+}
+
+model Invoice {
+  id              String        @id @default(uuid())
+  customerId      String
+  stripeInvoiceId String        @unique
+  amount          Int
+  currency        String        @default("usd")
+  status          InvoiceStatus
+  description     String?
+  pdfUrl          String?
+  hostedUrl       String?
+  periodStart     DateTime?
+  periodEnd       DateTime?
+  paidAt          DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  customer BillingCustomer @relation(fields: [customerId], references: [id])
+
+  @@index([customerId])
+  @@index([status])
+}
+
+enum InvoiceStatus {
+  DRAFT
+  OPEN
+  PAID
+  VOID
+  UNCOLLECTIBLE
+}
+
+model PaymentMethod {
+  id                    String   @id @default(uuid())
+  customerId            String
+  stripePaymentMethodId String   @unique
+  type                  String
+  last4                 String?
+  brand                 String?
+  expiryMonth           Int?
+  expiryYear            Int?
+  isDefault             Boolean  @default(false)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  customer BillingCustomer @relation(fields: [customerId], references: [id])
+
+  @@index([customerId])
+}
+
+model PlanLimit {
+  id           String   @id @default(uuid())
+  plan         PlanType @unique
+  maxMembers   Int
+  maxProjects  Int
+  maxStorage   BigInt
+  maxBoards    Int
+  hasAi        Boolean  @default(false)
+  hasReports   Boolean  @default(false)
+  hasSso       Boolean  @default(false)
+  hasApi       Boolean  @default(false)
+  priceMonthly Int
+  priceYearly  Int
+  features     String[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
