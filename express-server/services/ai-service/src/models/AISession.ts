@@ -33,7 +33,10 @@ export interface IAISession {
   updatedAt: Date;
 }
 
-export interface IAISessionDocument extends IAISession, Document {
+// `IAISession.model` (the OpenAI model name, e.g. "gpt-4") collides with
+// Mongoose's own `Document.model()` method, so that member is omitted from
+// the base `Document` type here in favor of the `IAISession` field.
+export interface IAISessionDocument extends IAISession, Omit<Document, 'model'> {
   _id: mongoose.Types.ObjectId;
 }
 
