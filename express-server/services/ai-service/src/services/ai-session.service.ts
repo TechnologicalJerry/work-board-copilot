@@ -1,11 +1,16 @@
 import mongoose from 'mongoose';
-import { AISession, IAISessionDocument, SessionType, IMessage } from '../models/AISession';
+import { AISession, IAISessionDocument, IAISession, SessionType, IMessage } from '../models/AISession';
 import { buildPaginatedResult, calculateSkip } from '@boardpilot/common';
 import { NotFoundError, ForbiddenError } from '@boardpilot/errors';
 import { cacheGet, cacheSet, cacheDel } from './redis.service';
 import logger from '@boardpilot/logger';
 
 const SESSION_CACHE_TTL = 300; // 5 minutes
+
+// List views exclude `messages` (see `.select('-messages')` below). Explicitly
+// typing the `.lean()` result keeps TS from trying to (and failing to) infer
+// the full Document-derived generic chain for a simple projected shape.
+type SessionSummary = Omit<IAISession, 'messages'> & { _id: mongoose.Types.ObjectId };
 
 export async function createSession(data: {
   userId: string;
@@ -70,7 +75,7 @@ export async function listSessions(
       .skip(skip)
       .limit(query.limit)
       .select('-messages') // Exclude messages for list view
-      .lean(),
+      .lean<SessionSummary[]>(),
     AISession.countDocuments(filter),
   ]);
 
