@@ -2,16 +2,14 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "rootDir": "./src",
-    "paths": {
-      "@boardpilot/types": ["../../shared/packages/types/src/index.ts"],
-      "@boardpilot/errors": ["../../shared/packages/errors/src/index.ts"],
-      "@boardpilot/logger": ["../../shared/packages/logger/src/index.ts"],
-      "@boardpilot/middlewares": ["../../shared/packages/middlewares/src/index.ts"],
-      "@boardpilot/common": ["../../shared/packages/common/src/index.ts"],
-      "@boardpilot/config": ["../../shared/packages/config/src/index.ts"]
-    }
+    "rootDir": "./src"
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "coverage"]
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "coverage"
+  ]
 }
