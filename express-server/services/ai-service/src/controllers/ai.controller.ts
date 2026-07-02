@@ -1,7 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { successResponse, paginatedResponse } from '@boardpilot/common';
-import { BadRequestError, TooManyRequestsError } from '@boardpilot/errors';
-import logger from '@boardpilot/logger';
+import { BadRequestError } from '@boardpilot/errors';
 import { config } from '../config';
 import {
   streamChatCompletion,
@@ -30,11 +29,20 @@ import {
 } from '../schemas/ai.schema';
 import { IMessage } from '../models/AISession';
 
+// Organization-scoped AI operations require an organizationId on the authenticated
+// user; the JWT payload marks it optional, so guard it explicitly here.
+function requireOrganizationId(organizationId: string | undefined): string {
+  if (!organizationId) {
+    throw new BadRequestError('An organization context is required for this operation.');
+  }
+  return organizationId;
+}
+
 // ── Chat (streaming SSE) ─────────────────────────────────────────────────────
 export async function chat(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const userId = req.user!.id;
-    const organizationId = req.user!.organizationId;
+    const organizationId = requireOrganizationId(req.user!.organizationId);
     const body = req.body as ChatRequest;
 
     // Load prior session messages if sessionId provided
@@ -97,7 +105,7 @@ export async function chat(req: Request, res: Response, next: NextFunction): Pro
 export async function sprintPlanning(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const userId = req.user!.id;
-    const organizationId = req.user!.organizationId;
+    const organizationId = requireOrganizationId(req.user!.organizationId);
     const body = req.body as SprintPlanningRequest;
 
     const userContent = `
@@ -162,7 +170,7 @@ ${body.backlogItems
 export async function taskBreakdown(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const userId = req.user!.id;
-    const organizationId = req.user!.organizationId;
+    const organizationId = requireOrganizationId(req.user!.organizationId);
     const body = req.body as TaskBreakdownRequest;
 
     const userContent = `
@@ -217,7 +225,7 @@ ${body.teamContext ? `Team Context: ${body.teamContext}` : ''}
 export async function standupSummary(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const userId = req.user!.id;
-    const organizationId = req.user!.organizationId;
+    const organizationId = requireOrganizationId(req.user!.organizationId);
     const body = req.body as StandupRequest;
 
     const formatTasks = (tasks: typeof body.completedYesterday) =>
@@ -268,7 +276,7 @@ ${body.blocked.length ? body.blocked.map((t) => `  - ${t.title}: ${t.blockerReas
 export async function releaseNotes(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const userId = req.user!.id;
-    const organizationId = req.user!.organizationId;
+    const organizationId = requireOrganizationId(req.user!.organizationId);
     const body = req.body as ReleaseNotesRequest;
 
     const userContent = `
@@ -317,7 +325,7 @@ ${body.additionalNotes ? `Additional Notes:\n${body.additionalNotes}` : ''}
 export async function bugAnalysis(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const userId = req.user!.id;
-    const organizationId = req.user!.organizationId;
+    const organizationId = requireOrganizationId(req.user!.organizationId);
     const body = req.body as BugAnalysisRequest;
 
     const userContent = `
@@ -378,7 +386,7 @@ ${body.environment ? `Environment: ${JSON.stringify(body.environment, null, 2)}`
 export async function meetingNotes(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const userId = req.user!.id;
-    const organizationId = req.user!.organizationId;
+    const organizationId = requireOrganizationId(req.user!.organizationId);
     const body = req.body as MeetingNotesRequest;
 
     const userContent = `
@@ -431,7 +439,7 @@ ${body.rawNotes}
 export async function getSessions(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const userId = req.user!.id;
-    const organizationId = req.user!.organizationId;
+    const organizationId = requireOrganizationId(req.user!.organizationId);
     const query = req.query as unknown as SessionQuery;
 
     const result = await listSessions(userId, organizationId, {
