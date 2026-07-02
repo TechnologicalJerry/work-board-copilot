@@ -3,18 +3,14 @@
   "compilerOptions": {
     "outDir": "./dist",
     "rootDir": "./src",
-    "baseUrl": ".",
-    "paths": {
-      "@boardpilot/types": ["../../shared/packages/types/src"],
-      "@boardpilot/errors": ["../../shared/packages/errors/src"],
-      "@boardpilot/common": ["../../shared/packages/common/src"],
-      "@boardpilot/logger": ["../../shared/packages/logger/src"],
-      "@boardpilot/middlewares": ["../../shared/packages/middlewares/src"],
-      "@boardpilot/events": ["../../shared/packages/events/src"],
-      "@boardpilot/validation": ["../../shared/packages/validation/src"],
-      "@boardpilot/config": ["../../shared/packages/config/src"]
-    }
+    "baseUrl": "."
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "tests"]
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "tests"
+  ]
 }
