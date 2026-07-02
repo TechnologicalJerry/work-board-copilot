@@ -1,6 +1,7 @@
 import { Application, Request, Response, NextFunction, RequestHandler } from 'express';
 import { createProxyMiddleware, Options } from 'http-proxy-middleware';
 import { IncomingMessage, ServerResponse } from 'http';
+import type { Socket } from 'net';
 import { serviceCircuitBreakers } from '../services/circuit-breaker';
 import { config } from '../config';
 import { logger } from '@boardpilot/logger';
@@ -75,7 +76,7 @@ function buildOnProxyReq(serviceName: string) {
  * Creates a proxy middleware for a single downstream service, protected by a circuit breaker.
  */
 export function createServiceProxy(
-  pathPrefix: string,
+  _pathPrefix: string,
   serviceConfig: ServiceConfig
 ): RequestHandler {
   const { target, serviceName } = serviceConfig;
@@ -109,10 +110,14 @@ export function createServiceProxy(
       error: (
         err: Error,
         req: IncomingMessage,
-        res: ServerResponse | Response
+        // http-proxy's ErrorCallback types `res` as `ServerResponse | Socket`
+        // (the Socket variant only occurs for WS upgrade errors, which this
+        // gateway does not proxy). Narrow to the Express `Response` we
+        // actually receive for HTTP requests before using response methods.
+        res: ServerResponse | Socket
       ): void => {
         const expressReq = req as Request;
-        const expressRes = res as Response;
+        const expressRes = res as unknown as Response;
         const log = expressReq.log ?? logger;
         const requestId = expressReq.context?.requestId;
 
@@ -190,15 +195,18 @@ export function createServiceProxy(
               }
             };
 
-            res.end = function (
-              this: Response,
-              ...args: Parameters<Response['end']>
-            ): Response {
+            // `Response['end']` is an overloaded signature; TypeScript can't
+            // verify a single override implementation against every overload,
+            // so we type the override loosely and assert it back to the
+            // original overloaded type. Behavior is unchanged: forward
+            // whatever arguments were passed straight through to the
+            // original `end`.
+            res.end = function (this: Response, ...args: unknown[]): Response {
               const statusCode = res.statusCode;
               // Treat 5xx as failures for the circuit breaker
               settle(statusCode < 500);
-              return originalEnd(...args);
-            };
+              return (originalEnd as (...a: unknown[]) => Response)(...args);
+            } as Response['end'];
 
             // Invoke HPM — it handles the actual proxy
             hpmProxy(req, res, (err?: unknown) => {
