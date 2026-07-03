@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import { AutomationService } from '../services/AutomationService';
 import { AUTOMATION_TEMPLATES } from '../data/templates';
-import { successResponse, paginatedResponse } from '@boardpilot/common';
+import { successResponse, paginatedResponse, buildPaginatedResult } from '@boardpilot/common';
 
 export class AutomationController {
   constructor(private readonly automationService: AutomationService) {}
@@ -32,12 +32,9 @@ export class AutomationController {
         Number(page) || 1,
         Number(limit) || 20,
       );
-      res.json(paginatedResponse(result.data, {
-        total: result.total,
-        page: result.page,
-        limit: result.limit,
-        totalPages: result.totalPages,
-      }));
+      res.json(paginatedResponse(
+        buildPaginatedResult(result.data, result.total, { page: result.page, limit: result.limit })
+      ));
     } catch (err) {
       next(err);
     }
@@ -105,12 +102,9 @@ export class AutomationController {
         Number(req.query.page) || 1,
         Number(req.query.limit) || 20,
       );
-      res.json(paginatedResponse(result.data, {
-        total: result.total,
-        page: result.page,
-        limit: result.limit,
-        totalPages: result.totalPages,
-      }));
+      res.json(paginatedResponse(
+        buildPaginatedResult(result.data, result.total, { page: result.page, limit: result.limit })
+      ));
     } catch (err) {
       next(err);
     }
