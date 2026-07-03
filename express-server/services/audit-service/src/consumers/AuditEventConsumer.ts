@@ -1,9 +1,9 @@
-import amqplib, { Connection, Channel } from 'amqplib';
+import amqplib, { ChannelModel, Channel } from 'amqplib';
 import { config } from '../config';
 import logger from '@boardpilot/logger';
 import { AuditLog } from '../models/AuditLog';
 
-let connection: Connection | null = null;
+let connection: ChannelModel | null = null;
 let channel: Channel | null = null;
 
 const EXCHANGE = 'audit.exchange';
