@@ -5,6 +5,7 @@ import { executeActions } from './ActionExecutor';
 import { NotFoundError } from '@boardpilot/errors';
 import logger from '@boardpilot/logger';
 import type { FilterQuery } from 'mongoose';
+import { Prisma } from '../generated/prisma-client';
 
 export class AutomationService {
   async create(dto: {
@@ -82,7 +83,7 @@ export class AutomationService {
           data: {
             ruleId: String(rule._id),
             triggeredBy: triggerType,
-            triggerData: eventData,
+            triggerData: eventData as Prisma.InputJsonValue,
             status: 'SKIPPED',
             actionsRun: 0,
             duration: Date.now() - startTime,
@@ -100,7 +101,7 @@ export class AutomationService {
             data: {
               ruleId: String(rule._id),
               triggeredBy: triggerType,
-              triggerData: eventData,
+              triggerData: eventData as Prisma.InputJsonValue,
               status,
               actionsRun: executed,
               error: errors.length > 0 ? errors.join('; ') : undefined,
@@ -118,7 +119,7 @@ export class AutomationService {
           data: {
             ruleId: String(rule._id),
             triggeredBy: triggerType,
-            triggerData: eventData,
+            triggerData: eventData as Prisma.InputJsonValue,
             status: 'FAILED',
             actionsRun: 0,
             error: err instanceof Error ? err.message : String(err),
