@@ -48,7 +48,7 @@ export async function getLogsByEntity(req: Request, res: Response, next: NextFun
 export async function getLogsByUser(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { userId, page, limit } = req.query as any;
-    const result = await AuditService.findByUser(userId, req.user!.organizationId, Number(page), Number(limit));
+    const result = await AuditService.findByUser(userId, req.user!.organizationId!, Number(page), Number(limit));
     res.json(paginatedResponse(result, req.context.requestId));
   } catch (err) {
     next(err);
@@ -76,7 +76,7 @@ export async function exportCsv(req: Request, res: Response, next: NextFunction)
 export async function getStats(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { days } = req.query as any;
-    const stats = await AuditService.getStats(req.user!.organizationId, Number(days));
+    const stats = await AuditService.getStats(req.user!.organizationId!, Number(days));
     res.json(successResponse(stats, req.context.requestId));
   } catch (err) {
     next(err);
