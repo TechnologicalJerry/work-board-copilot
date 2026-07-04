@@ -1,10 +1,10 @@
 import type { Request, Response, NextFunction } from 'express';
 import { BillingService } from '../../services/BillingService';
 import { StripeService } from '../../infrastructure/stripe/StripeService';
-import { successResponse, paginatedResponse } from '@boardpilot/common';
+import { successResponse, paginatedResponse, buildPaginatedResult } from '@boardpilot/common';
 import { BadRequestError } from '@boardpilot/errors';
 import logger from '@boardpilot/logger';
-import type { PlanType } from '@prisma/client';
+import type { PlanType } from '../../generated/prisma-client';
 
 export class BillingController {
   constructor(
@@ -86,12 +86,9 @@ export class BillingController {
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 20;
       const result = await this.billingService.getInvoices(orgId, page, limit);
-      res.json(paginatedResponse(result.data, {
-        total: result.total,
-        page: result.page,
-        limit: result.limit,
-        totalPages: result.totalPages,
-      }));
+      res.json(paginatedResponse(
+        buildPaginatedResult(result.data, result.total, { page: result.page, limit: result.limit })
+      ));
     } catch (err) {
       next(err);
     }
