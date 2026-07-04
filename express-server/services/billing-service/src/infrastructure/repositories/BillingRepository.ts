@@ -6,7 +6,8 @@ import type {
   PaymentMethod,
   PlanLimit,
   PlanType,
-} from '@prisma/client';
+  Prisma,
+} from '../../generated/prisma-client';
 
 export class BillingRepository {
   // --- Customer ---
@@ -82,10 +83,13 @@ export class BillingRepository {
     return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
-  async upsertInvoice(stripeInvoiceId: string, data: Omit<Parameters<typeof prisma.invoice.create>[0]['data'], 'stripeInvoiceId'>): Promise<Invoice> {
+  async upsertInvoice(
+    stripeInvoiceId: string,
+    data: Omit<Prisma.InvoiceUncheckedCreateInput, 'stripeInvoiceId'>,
+  ): Promise<Invoice> {
     return prisma.invoice.upsert({
       where: { stripeInvoiceId },
-      update: data,
+      update: data as Prisma.InvoiceUncheckedUpdateInput,
       create: { ...data, stripeInvoiceId },
     });
   }
