@@ -3,7 +3,7 @@ import { StripeService } from '../infrastructure/stripe/StripeService';
 import { BillingEventPublisher } from '../infrastructure/events/BillingEventPublisher';
 import { NotFoundError, BadRequestError, ConflictError } from '@boardpilot/errors';
 import type Stripe from 'stripe';
-import type { PlanType } from '@prisma/client';
+import type { PlanType } from '../generated/prisma-client';
 import logger from '@boardpilot/logger';
 
 const PLAN_PRICE_IDS: Record<string, { monthly: string; yearly: string }> = {
