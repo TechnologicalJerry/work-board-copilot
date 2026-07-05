@@ -1,4 +1,4 @@
-import { Board, BoardColumn, Swimlane, BoardFilter, Prisma } from '@prisma/client';
+import { Board, BoardColumn, Swimlane, BoardFilter, Prisma } from '../../generated/prisma-client';
 import { PaginationOptions } from '@boardpilot/types';
 import { calculateSkip } from '@boardpilot/common';
 import prisma from '../../database/prisma';
