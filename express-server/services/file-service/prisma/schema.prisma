@@ -1,0 +1,69 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model File {
+  id             String     @id @default(uuid())
+  organizationId String
+  workspaceId    String?
+  uploaderId     String
+  entityId       String?
+  entityType     String?
+  originalName   String
+  storedName     String
+  key            String     @unique
+  bucket         String
+  mimeType       String
+  size           BigInt
+  width          Int?
+  height         Int?
+  url            String
+  thumbnailUrl   String?
+  thumbnailKey   String?
+  isPublic       Boolean    @default(false)
+  status         FileStatus @default(UPLOADED)
+  metadata       Json?
+  checksum       String?
+  version        Int        @default(1)
+  parentId       String?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  deletedAt      DateTime?
+
+  versions FileVersion[]
+
+  @@index([organizationId])
+  @@index([uploaderId])
+  @@index([entityId, entityType])
+  @@index([key])
+}
+
+enum FileStatus {
+  UPLOADING
+  UPLOADED
+  PROCESSING
+  READY
+  FAILED
+  DELETED
+}
+
+model FileVersion {
+  id        String   @id @default(uuid())
+  fileId    String
+  version   Int
+  key       String   @unique
+  size      BigInt
+  url       String
+  createdBy String
+  createdAt DateTime @default(now())
+
+  file File @relation(fields: [fileId], references: [id])
+
+  @@index([fileId])
+}
