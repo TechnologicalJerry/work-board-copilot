@@ -1,12 +1,11 @@
-import { Board, BoardColumn, Swimlane, BoardFilter } from '@prisma/client';
+import { Board, BoardColumn, Swimlane, BoardFilter } from '../../generated/prisma-client';
 import { PaginatedResult, EventMetadata } from '@boardpilot/types';
-import { NotFoundError, ForbiddenError, ConflictError } from '@boardpilot/errors';
+import { NotFoundError, ForbiddenError } from '@boardpilot/errors';
 import { buildPaginatedResult, parsePaginationQuery } from '@boardpilot/common';
 import logger from '@boardpilot/logger';
 import { boardRepository, BoardWithDetails } from './board.repository';
 import { BoardEventPublisher } from './board.events';
 import { getCached, setCached, deleteCached } from '../../database/redis';
-import { config } from '../../config';
 import {
   CreateBoardInput,
   UpdateBoardInput,
