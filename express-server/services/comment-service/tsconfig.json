@@ -2,7 +2,9 @@
   "compilerOptions": {
     "target": "ES2022",
     "module": "commonjs",
-    "lib": ["ES2022"],
+    "lib": [
+      "ES2022"
+    ],
     "outDir": "./dist",
     "rootDir": "./src",
     "strict": true,
@@ -12,18 +14,14 @@
     "resolveJsonModule": true,
     "declaration": true,
     "declarationMap": true,
-    "sourceMap": true,
-    "paths": {
-      "@boardpilot/common": ["../../shared/packages/common/src"],
-      "@boardpilot/config": ["../../shared/packages/config/src"],
-      "@boardpilot/errors": ["../../shared/packages/errors/src"],
-      "@boardpilot/events": ["../../shared/packages/events/src"],
-      "@boardpilot/logger": ["../../shared/packages/logger/src"],
-      "@boardpilot/middlewares": ["../../shared/packages/middlewares/src"],
-      "@boardpilot/types": ["../../shared/packages/types/src"],
-      "@boardpilot/validation": ["../../shared/packages/validation/src"]
-    }
+    "sourceMap": true
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "tests"]
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "tests"
+  ]
 }
