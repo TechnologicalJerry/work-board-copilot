@@ -1,0 +1,103 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Organization {
+  id            String    @id @default(uuid())
+  name          String
+  slug          String    @unique
+  domain        String?   @unique
+  logoUrl       String?
+  website       String?
+  description   String?
+  industry      String?
+  size          String?
+  country       String?
+  timezone      String    @default("UTC")
+  plan          PlanType  @default(FREE)
+  planExpiresAt DateTime?
+  maxMembers    Int       @default(5)
+  maxProjects   Int       @default(3)
+  maxStorage    BigInt    @default(104857600)
+  settings      Json      @default("{}")
+  ownerId       String
+  status        OrgStatus @default(ACTIVE)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  members     OrgMember[]
+  invitations OrgInvitation[]
+
+  @@index([ownerId])
+}
+
+enum PlanType {
+  FREE
+  STARTER
+  PROFESSIONAL
+  ENTERPRISE
+}
+
+enum OrgStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+model OrgMember {
+  id             String       @id @default(uuid())
+  organizationId String
+  userId         String
+  role           OrgRole      @default(MEMBER)
+  status         MemberStatus @default(ACTIVE)
+  invitedBy      String?
+  joinedAt       DateTime     @default(now())
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([organizationId])
+  @@index([userId])
+}
+
+enum OrgRole {
+  OWNER
+  ADMIN
+  MEMBER
+  BILLING_ADMIN
+  VIEWER
+}
+
+enum MemberStatus {
+  ACTIVE
+  SUSPENDED
+  LEFT
+}
+
+model OrgInvitation {
+  id             String    @id @default(uuid())
+  organizationId String
+  email          String
+  role           OrgRole   @default(MEMBER)
+  token          String    @unique
+  invitedBy      String
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  revokedAt      DateTime?
+  createdAt      DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([token])
+  @@index([email])
+}
