@@ -1,0 +1,158 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Project {
+  id             String        @id @default(uuid())
+  organizationId String
+  workspaceId    String
+  key            String
+  name           String
+  slug           String
+  description    String?
+  iconUrl        String?
+  color          String?
+  type           ProjectType   @default(SCRUM)
+  status         ProjectStatus @default(ACTIVE)
+  visibility     Visibility    @default(PRIVATE)
+  ownerId        String
+  leadId         String?
+  startDate      DateTime?
+  targetDate     DateTime?
+  completedAt    DateTime?
+  settings       Json          @default("{}")
+  createdBy      String
+  updatedBy      String
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  deletedAt      DateTime?
+
+  members      ProjectMember[]
+  labels       Label[]
+  customFields CustomField[]
+  milestones   Milestone[]
+
+  @@unique([organizationId, key])
+  @@unique([workspaceId, slug])
+  @@index([organizationId])
+  @@index([workspaceId])
+  @@index([ownerId])
+  @@index([status])
+}
+
+enum ProjectType {
+  SCRUM
+  KANBAN
+  SCRUMBAN
+}
+
+enum ProjectStatus {
+  PLANNING
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  ARCHIVED
+}
+
+enum Visibility {
+  PUBLIC
+  PRIVATE
+  INTERNAL
+}
+
+model ProjectMember {
+  id        String      @id @default(uuid())
+  projectId String
+  userId    String
+  role      ProjectRole @default(MEMBER)
+  addedBy   String
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@index([projectId])
+  @@index([userId])
+}
+
+enum ProjectRole {
+  MANAGER
+  LEAD
+  MEMBER
+  VIEWER
+}
+
+model Label {
+  id          String   @id @default(uuid())
+  projectId   String
+  name        String
+  color       String
+  description String?
+  createdBy   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, name])
+  @@index([projectId])
+}
+
+model CustomField {
+  id           String          @id @default(uuid())
+  projectId    String
+  name         String
+  fieldType    CustomFieldType
+  options      Json?
+  isRequired   Boolean         @default(false)
+  defaultValue String?
+  position     Int
+  createdBy    String
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+enum CustomFieldType {
+  TEXT
+  NUMBER
+  DATE
+  SELECT
+  MULTI_SELECT
+  USER
+  URL
+  CHECKBOX
+}
+
+model Milestone {
+  id          String          @id @default(uuid())
+  projectId   String
+  name        String
+  description String?
+  dueDate     DateTime?
+  status      MilestoneStatus @default(UPCOMING)
+  createdBy   String
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+enum MilestoneStatus {
+  UPCOMING
+  IN_PROGRESS
+  COMPLETED
+  OVERDUE
+}
