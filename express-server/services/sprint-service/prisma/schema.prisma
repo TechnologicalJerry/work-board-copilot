@@ -1,0 +1,84 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Sprint {
+  id             String       @id @default(uuid())
+  projectId      String
+  name           String
+  goal           String?
+  status         SprintStatus @default(PLANNED)
+  startDate      DateTime?
+  endDate        DateTime?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  capacity       Int?
+  velocityPoints Int?
+  notes          String?
+  createdBy      String
+  updatedBy      String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  items          SprintItem[]
+  velocityData   SprintVelocity?
+  burndowns      BurndownSnapshot[]
+
+  @@index([projectId])
+  @@index([status])
+}
+
+enum SprintStatus {
+  PLANNED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+model SprintItem {
+  id          String    @id @default(uuid())
+  sprintId    String
+  taskId      String
+  storyPoints Int?
+  addedBy     String
+  addedAt     DateTime  @default(now())
+  removedAt   DateTime?
+  completedAt DateTime?
+  sprint      Sprint    @relation(fields: [sprintId], references: [id], onDelete: Cascade)
+
+  @@unique([sprintId, taskId])
+  @@index([sprintId])
+  @@index([taskId])
+}
+
+model SprintVelocity {
+  id              String   @id @default(uuid())
+  sprintId        String   @unique
+  plannedPoints   Int      @default(0)
+  completedPoints Int      @default(0)
+  addedPoints     Int      @default(0)
+  removedPoints   Int      @default(0)
+  carryOverPoints Int      @default(0)
+  completionRate  Float    @default(0)
+  calculatedAt    DateTime @default(now())
+  sprint          Sprint   @relation(fields: [sprintId], references: [id], onDelete: Cascade)
+}
+
+model BurndownSnapshot {
+  id              String   @id @default(uuid())
+  sprintId        String
+  date            DateTime
+  remainingPoints Int
+  completedPoints Int
+  idealPoints     Int
+  createdAt       DateTime @default(now())
+  sprint          Sprint   @relation(fields: [sprintId], references: [id], onDelete: Cascade)
+
+  @@unique([sprintId, date])
+  @@index([sprintId])
+}
