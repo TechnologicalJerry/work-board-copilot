@@ -1,0 +1,150 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Task {
+  id                    String    @id @default(uuid())
+  projectId             String
+  workspaceId           String
+  organizationId        String
+  key                   String
+  title                 String    @db.VarChar(500)
+  description           String?   @db.Text
+  type                  TaskType  @default(TASK)
+  status                String    @default("TODO")
+  priority              Priority  @default(MEDIUM)
+  storyPoints           Int?
+  estimatedHours        Float?
+  actualHours           Float?    @default(0)
+  assigneeId            String?
+  reporterId            String
+  parentId              String?
+  epicId                String?
+  milestoneId           String?
+  sprintId              String?
+  boardColumnId         String?
+  position              Float     @default(0)
+  dueDate               DateTime?
+  startDate             DateTime?
+  completedAt           DateTime?
+  labels                String[]
+  tags                  String[]
+  customFields          Json      @default("{}")
+  attachmentCount       Int       @default(0)
+  commentCount          Int       @default(0)
+  subtaskCount          Int       @default(0)
+  completedSubtaskCount Int       @default(0)
+  watcherIds            String[]
+  mentionIds            String[]
+  isRecurring           Boolean   @default(false)
+  recurringConfig       Json?
+  nextOccurrence        DateTime?
+  createdBy             String
+  updatedBy             String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  deletedAt             DateTime?
+
+  subtasks        Task[]           @relation("TaskSubtasks")
+  parent          Task?            @relation("TaskSubtasks", fields: [parentId], references: [id])
+  dependencies    TaskDependency[] @relation("DependentTask")
+  dependents      TaskDependency[] @relation("BlockingTask")
+  activity        TaskActivity[]
+  sequenceTracker TaskSequence?    @relation("TaskSequence")
+
+  @@unique([projectId, key])
+  @@index([projectId])
+  @@index([workspaceId])
+  @@index([organizationId])
+  @@index([assigneeId])
+  @@index([sprintId])
+  @@index([status])
+  @@index([priority])
+  @@index([epicId])
+  @@index([parentId])
+  @@index([deletedAt])
+  @@index([createdAt])
+  @@index([position])
+}
+
+enum TaskType {
+  EPIC
+  STORY
+  TASK
+  SUBTASK
+  BUG
+  FEATURE
+  IMPROVEMENT
+}
+
+enum Priority {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+  NONE
+}
+
+model TaskSequence {
+  id        String @id @default(uuid())
+  projectId String @unique
+  taskId    String @unique
+  sequence  Int
+  task      Task   @relation("TaskSequence", fields: [taskId], references: [id])
+
+  @@index([projectId])
+}
+
+model ProjectKeyCounter {
+  projectId String   @id
+  lastKey   Int      @default(0)
+  updatedAt DateTime @updatedAt
+}
+
+model TaskDependency {
+  id          String         @id @default(uuid())
+  taskId      String
+  dependsOnId String
+  type        DependencyType @default(BLOCKS)
+  createdBy   String
+  createdAt   DateTime       @default(now())
+
+  task      Task @relation("DependentTask", fields: [taskId], references: [id], onDelete: Cascade)
+  dependsOn Task @relation("BlockingTask", fields: [dependsOnId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, dependsOnId])
+  @@index([taskId])
+  @@index([dependsOnId])
+}
+
+enum DependencyType {
+  BLOCKS
+  IS_BLOCKED_BY
+  RELATES_TO
+  DUPLICATES
+  IS_DUPLICATED_BY
+}
+
+model TaskActivity {
+  id        String   @id @default(uuid())
+  taskId    String
+  userId    String
+  action    String
+  field     String?
+  oldValue  String?
+  newValue  String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@index([userId])
+  @@index([createdAt])
+}
