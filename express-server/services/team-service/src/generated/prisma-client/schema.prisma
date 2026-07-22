@@ -1,0 +1,74 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Team {
+  id             String    @id @default(uuid())
+  organizationId String
+  workspaceId    String?
+  name           String
+  slug           String
+  description    String?
+  color          String?
+  iconUrl        String?
+  leadId         String?
+  isPrivate      Boolean   @default(false)
+  capacity       Int?
+  createdBy      String
+  updatedBy      String
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+
+  members TeamMember[]
+
+  @@unique([organizationId, slug])
+  @@index([organizationId])
+  @@index([workspaceId])
+}
+
+model TeamMember {
+  id           String   @id @default(uuid())
+  teamId       String
+  userId       String
+  role         TeamRole @default(MEMBER)
+  availability Int      @default(100)
+  addedBy      String
+  joinedAt     DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userId])
+  @@index([teamId])
+  @@index([userId])
+}
+
+enum TeamRole {
+  LEAD
+  MEMBER
+  VIEWER
+}
+
+model Department {
+  id             String    @id @default(uuid())
+  organizationId String
+  name           String
+  slug           String
+  description    String?
+  headId         String?
+  createdBy      String
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+
+  @@unique([organizationId, slug])
+  @@index([organizationId])
+}
