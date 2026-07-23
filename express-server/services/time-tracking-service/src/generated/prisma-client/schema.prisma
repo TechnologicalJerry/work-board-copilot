@@ -1,0 +1,73 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model TimeEntry {
+  id             String          @id @default(uuid())
+  userId         String
+  taskId         String?
+  projectId      String
+  organizationId String
+  description    String?
+  startTime      DateTime
+  endTime        DateTime?
+  duration       Int?
+  isBillable     Boolean         @default(true)
+  hourlyRate     Float?
+  tags           String[]
+  status         TimeEntryStatus @default(RUNNING)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  deletedAt      DateTime?
+
+  @@index([userId])
+  @@index([taskId])
+  @@index([projectId])
+  @@index([organizationId])
+  @@index([startTime])
+  @@index([status])
+}
+
+enum TimeEntryStatus {
+  RUNNING
+  STOPPED
+  SUBMITTED
+  APPROVED
+  REJECTED
+}
+
+model Timesheet {
+  id             String          @id @default(uuid())
+  userId         String
+  organizationId String
+  projectId      String?
+  periodStart    DateTime
+  periodEnd      DateTime
+  totalHours     Float           @default(0)
+  billableHours  Float           @default(0)
+  status         TimesheetStatus @default(DRAFT)
+  notes          String?
+  submittedAt    DateTime?
+  approvedAt     DateTime?
+  approvedBy     String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@unique([userId, periodStart, periodEnd])
+  @@index([userId])
+  @@index([organizationId])
+  @@index([periodStart])
+}
+
+enum TimesheetStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+}
