@@ -1,0 +1,17 @@
+{
+  "name": "@boardpilot/errors",
+  "version": "1.0.0",
+  "description": "Shared error types for BoardPilot AI",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@boardpilot/types": "1.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}
