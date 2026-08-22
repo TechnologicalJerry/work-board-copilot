@@ -1,31 +1,22 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
-import { APP_ENVIRONMENT, AppEnvironment, defaultEnvironment } from '../config/app-environment.interface';
+import { Injectable, inject } from '@angular/core';
+import { AppConfigService } from '../config/app-config.service';
 
 @Injectable({
   providedIn: 'root',
 })
 export class ConfigService {
-  private readonly initialEnv = inject(APP_ENVIRONMENT, { optional: true }) ?? defaultEnvironment;
+  private readonly appConfigService = inject(AppConfigService);
 
-  // Signal state for environment config
-  readonly environment = signal<AppEnvironment>(this.initialEnv);
-
-  // Computed signals
-  readonly apiGatewayUrl = computed(() => this.environment().apiGatewayUrl);
-  readonly isProduction = computed(() => this.environment().production);
-  readonly featureFlags = computed(() => this.environment().featureFlags);
+  readonly config = this.appConfigService.config;
+  readonly apiGatewayUrl = this.appConfigService.apiGatewayUrl;
+  readonly isProduction = this.appConfigService.isProduction;
+  readonly featureFlags = this.appConfigService.featureFlags;
 
   isFeatureEnabled(flagName: string): boolean {
-    return !!this.environment().featureFlags[flagName];
+    return this.appConfigService.isFeatureEnabled(flagName);
   }
 
   updateFeatureFlags(flags: Record<string, boolean>): void {
-    this.environment.update((env) => ({
-      ...env,
-      featureFlags: {
-        ...env.featureFlags,
-        ...flags,
-      },
-    }));
+    this.appConfigService.updateFeatureFlags(flags);
   }
 }
