@@ -1,4 +1,4 @@
-import { ApplicationConfig, ErrorHandler, importProvidersFrom } from '@angular/core';
+import { ApplicationConfig, ErrorHandler, importProvidersFrom, provideAppInitializer, inject } from '@angular/core';
 import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideClientHydration } from '@angular/platform-browser';
@@ -10,8 +10,9 @@ import { ErrorHandlerService } from '@core/errors/error-handler.service';
 import { apiPrefixInterceptor } from '@core/http/interceptors/api-prefix.interceptor';
 import { correlationIdInterceptor } from '@core/http/interceptors/correlation-id.interceptor';
 import { loggingInterceptor } from '@core/http/interceptors/logging.interceptor';
-import { authPlaceholderInterceptor } from '@core/http/interceptors/auth-placeholder.interceptor';
+import { authInterceptor } from '@core/http/interceptors/auth.interceptor';
 import { errorInterceptor } from '@core/http/interceptors/error.interceptor';
+import { AuthService } from './features/auth/services/auth.service';
 
 import {
   LucideAngularModule,
@@ -49,11 +50,12 @@ export const appConfig: ApplicationConfig = {
         apiPrefixInterceptor,
         correlationIdInterceptor,
         loggingInterceptor,
-        authPlaceholderInterceptor,
+        authInterceptor,
         errorInterceptor,
       ])
     ),
     provideClientHydration(),
+    provideAppInitializer(() => inject(AuthService).restoreSession()),
     { provide: ErrorHandler, useClass: ErrorHandlerService },
     { provide: APP_CONFIG, useValue: defaultConfig },
     { provide: APP_ENVIRONMENT, useValue: defaultEnvironment },
