@@ -5,9 +5,13 @@ import { provideClientHydration } from '@angular/platform-browser';
 
 import { routes } from './app.routes';
 import { APP_ENVIRONMENT, defaultEnvironment } from '@core/config/app-environment.interface';
-import { GlobalErrorHandlerService } from '@core/errors/global-error-handler.service';
-import { apiPrefixInterceptor } from '@core/interceptors/api-prefix.interceptor';
-import { errorInterceptor } from '@core/interceptors/error.interceptor';
+import { APP_CONFIG, defaultConfig } from '@core/config/app-config';
+import { ErrorHandlerService } from '@core/errors/error-handler.service';
+import { apiPrefixInterceptor } from '@core/http/interceptors/api-prefix.interceptor';
+import { correlationIdInterceptor } from '@core/http/interceptors/correlation-id.interceptor';
+import { loggingInterceptor } from '@core/http/interceptors/logging.interceptor';
+import { authPlaceholderInterceptor } from '@core/http/interceptors/auth-placeholder.interceptor';
+import { errorInterceptor } from '@core/http/interceptors/error.interceptor';
 
 import {
   LucideAngularModule,
@@ -40,9 +44,18 @@ import {
 export const appConfig: ApplicationConfig = {
   providers: [
     provideRouter(routes, withComponentInputBinding()),
-    provideHttpClient(withInterceptors([apiPrefixInterceptor, errorInterceptor])),
+    provideHttpClient(
+      withInterceptors([
+        apiPrefixInterceptor,
+        correlationIdInterceptor,
+        loggingInterceptor,
+        authPlaceholderInterceptor,
+        errorInterceptor,
+      ])
+    ),
     provideClientHydration(),
-    { provide: ErrorHandler, useClass: GlobalErrorHandlerService },
+    { provide: ErrorHandler, useClass: ErrorHandlerService },
+    { provide: APP_CONFIG, useValue: defaultConfig },
     { provide: APP_ENVIRONMENT, useValue: defaultEnvironment },
     importProvidersFrom(
       LucideAngularModule.pick({
