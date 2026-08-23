@@ -2,11 +2,36 @@ import { TestBed, ComponentFixture } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
+import { importProvidersFrom } from '@angular/core';
 import { AppShellComponent } from './app-shell.component';
 import { OrganizationContextService } from '@core/context/organization-context.service';
 import { WorkspaceContextService } from '@core/context/workspace-context.service';
 import { NavigationService } from '@core/navigation/navigation.service';
 import { AuthService } from '@features/auth/services/auth.service';
+import {
+  LucideAngularModule,
+  LayoutDashboard,
+  Kanban,
+  Building,
+  Boxes,
+  Users,
+  FolderKanban,
+  CheckSquare,
+  Zap,
+  MessageSquare,
+  FileText,
+  Paperclip,
+  Bell,
+  Clock,
+  BarChart3,
+  Workflow,
+  Search,
+  Bot,
+  CreditCard,
+  Settings,
+  ChevronRight,
+  ChevronLeft,
+} from 'lucide-angular';
 
 describe('AppShellComponent', () => {
   let component: AppShellComponent;
@@ -23,6 +48,31 @@ describe('AppShellComponent', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         provideRouter([]),
+        importProvidersFrom(
+          LucideAngularModule.pick({
+            LayoutDashboard,
+            Kanban,
+            Building,
+            Boxes,
+            Users,
+            FolderKanban,
+            CheckSquare,
+            Zap,
+            MessageSquare,
+            FileText,
+            Paperclip,
+            Bell,
+            Clock,
+            BarChart3,
+            Workflow,
+            Search,
+            Bot,
+            CreditCard,
+            Settings,
+            ChevronRight,
+            ChevronLeft,
+          })
+        ),
       ],
     }).compileComponents();
 
