@@ -1,4 +1,4 @@
-import { TestBed, ComponentFixture } from '@angular/core';
+import { TestBed, ComponentFixture } from '@angular/core/testing';
 import { OrganizationSwitcherComponent } from './organization-switcher.component';
 import { OrganizationContextService } from '@core/context/organization-context.service';
 
