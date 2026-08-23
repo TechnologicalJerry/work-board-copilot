@@ -19,8 +19,11 @@ export const LAYOUT_ROUTES: Routes = [
       },
       {
         path: 'dashboard',
-        loadComponent: () =>
-          import('../features/dashboard/dashboard-overview.component').then((m) => m.DashboardOverviewComponent),
+        loadComponent: () => import('./pages/app-home/app-home.component').then((m) => m.AppHomeComponent),
+      },
+      {
+        path: 'access-denied',
+        loadComponent: () => import('./pages/access-denied/access-denied.component').then((m) => m.AccessDeniedComponent),
       },
       {
         path: 'organizations',
@@ -93,6 +96,10 @@ export const LAYOUT_ROUTES: Routes = [
       {
         path: 'settings',
         loadChildren: () => import('../features/settings/settings.routes').then((m) => m.SETTINGS_ROUTES),
+      },
+      {
+        path: '**',
+        loadComponent: () => import('./pages/not-found/not-found.component').then((m) => m.NotFoundComponent),
       },
     ],
   },
