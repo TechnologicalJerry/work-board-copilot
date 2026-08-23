@@ -9,6 +9,7 @@ import { APP_CONFIG, defaultConfig } from '@core/config/app-config';
 import { ErrorHandlerService } from '@core/errors/error-handler.service';
 import { apiPrefixInterceptor } from '@core/http/interceptors/api-prefix.interceptor';
 import { correlationIdInterceptor } from '@core/http/interceptors/correlation-id.interceptor';
+import { tenantContextInterceptor } from '@core/http/interceptors/tenant-context.interceptor';
 import { loggingInterceptor } from '@core/http/interceptors/logging.interceptor';
 import { authInterceptor } from '@core/http/interceptors/auth.interceptor';
 import { errorInterceptor } from '@core/http/interceptors/error.interceptor';
@@ -49,6 +50,7 @@ export const appConfig: ApplicationConfig = {
       withInterceptors([
         apiPrefixInterceptor,
         correlationIdInterceptor,
+        tenantContextInterceptor,
         loggingInterceptor,
         authInterceptor,
         errorInterceptor,
