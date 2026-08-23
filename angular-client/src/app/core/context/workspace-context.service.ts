@@ -44,19 +44,16 @@ export class WorkspaceContextService {
 
   constructor() {
     // Automatically revalidate and update workspace when Organization changes
-    effect(
-      () => {
-        const available = this.availableWorkspaces();
-        const current = this.selectedWorkspaceSignal();
+    effect(() => {
+      const available = this.availableWorkspaces();
+      const current = this.selectedWorkspaceSignal();
 
-        if (!current || !available.some((ws) => ws.id === current.id)) {
-          // Current workspace doesn't belong to selected organization, reset to default/first
-          const fallback = available.find((ws) => ws.isDefault) ?? available[0] ?? null;
-          this.setWorkspace(fallback);
-        }
-      },
-      { allowSignalWrites: true }
-    );
+      if (!current || !available.some((ws) => ws.id === current.id)) {
+        // Current workspace doesn't belong to selected organization, reset to default/first
+        const fallback = available.find((ws) => ws.isDefault) ?? available[0] ?? null;
+        this.setWorkspace(fallback);
+      }
+    });
 
     this.restorePersistedWorkspace();
   }
