@@ -149,4 +149,11 @@ export class AuthService {
       this.state.setReturnUrl(null);
     }
   }
+
+  /**
+   * Update current user profile in signal state
+   */
+  updateCurrentUser(partialUser: Partial<AuthenticatedUser>): void {
+    this.state.updateUser(partialUser);
+  }
 }
