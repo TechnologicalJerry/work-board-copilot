@@ -29,6 +29,13 @@ export class AuthState {
     this.status.set('authenticated');
   }
 
+  updateUser(partialUser: Partial<AuthenticatedUser>): void {
+    const current = this.user();
+    if (current) {
+      this.user.set({ ...current, ...partialUser });
+    }
+  }
+
   setUnauthenticated(): void {
     this.user.set(null);
     this.accessToken.set(null);
