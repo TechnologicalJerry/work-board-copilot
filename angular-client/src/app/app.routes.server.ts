@@ -22,6 +22,22 @@ export const serverRoutes: ServerRoute[] = [
     renderMode: RenderMode.Client,
   },
   {
+    path: 'projects/:id',
+    renderMode: RenderMode.Client,
+  },
+  {
+    path: 'projects/:id/settings',
+    renderMode: RenderMode.Client,
+  },
+  {
+    path: 'tasks/:id',
+    renderMode: RenderMode.Client,
+  },
+  {
+    path: 'sprints/:id',
+    renderMode: RenderMode.Client,
+  },
+  {
     path: '**',
     renderMode: RenderMode.Prerender,
   },
