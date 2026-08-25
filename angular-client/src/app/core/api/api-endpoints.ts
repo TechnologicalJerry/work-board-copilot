@@ -16,7 +16,7 @@ export const API_ENDPOINTS = {
   DOCUMENTS: '/documents',
   FILES: '/files',
   NOTIFICATIONS: '/notifications',
-  TIME_TRACKING: '/time-tracking',
+  TIME_TRACKING: '/time',
   REPORTS: '/reports',
   AUTOMATION: '/automation',
   SEARCH: '/search',
