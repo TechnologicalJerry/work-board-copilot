@@ -78,6 +78,10 @@ export const LAYOUT_ROUTES: Routes = [
         loadChildren: () => import('../features/reports/reports.routes').then((m) => m.REPORTS_ROUTES),
       },
       {
+        path: 'audit',
+        loadChildren: () => import('../features/audit/audit.routes').then((m) => m.AUDIT_ROUTES),
+      },
+      {
         path: 'automation',
         loadChildren: () => import('../features/automation/automation.routes').then((m) => m.AUTOMATION_ROUTES),
       },
