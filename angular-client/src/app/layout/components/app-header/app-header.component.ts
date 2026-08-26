@@ -1,10 +1,11 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, signal, HostListener } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 import { NavigationService } from '@core/navigation/navigation.service';
 import { OrganizationSwitcherComponent } from '../organization-switcher/organization-switcher.component';
 import { WorkspaceSwitcherComponent } from '../workspace-switcher/workspace-switcher.component';
 import { UserMenuComponent } from '../user-menu/user-menu.component';
+import { GlobalSearchModalComponent } from '@features/search/components/global-search-modal/global-search-modal.component';
 
 @Component({
   selector: 'app-header',
@@ -15,6 +16,7 @@ import { UserMenuComponent } from '../user-menu/user-menu.component';
     OrganizationSwitcherComponent,
     WorkspaceSwitcherComponent,
     UserMenuComponent,
+    GlobalSearchModalComponent,
   ],
   template: `
     <header class="h-16 bg-slate-900 border-b border-slate-800/80 px-4 sm:px-6 flex items-center justify-between z-30 shrink-0 select-none">
@@ -40,26 +42,26 @@ import { UserMenuComponent } from '../user-menu/user-menu.component';
         </div>
       </div>
 
-      <!-- Right side: Global Search Placeholder, Notifications Placeholder, User Menu -->
+      <!-- Right side: Global Search Button, Notifications, User Menu -->
       <div class="flex items-center space-x-3">
-        <!-- Global Search Trigger Placeholder -->
+        <!-- Global Search Trigger -->
         <button
           type="button"
-          routerLink="/search"
+          (click)="isSearchOpen.set(true)"
           class="hidden lg:flex items-center space-x-2.5 px-3 py-1.5 rounded-xl bg-slate-950/80 hover:bg-slate-800/60 border border-slate-800 text-slate-400 hover:text-slate-200 text-xs transition-all"
         >
-          <lucide-icon name="Search" class="w-3.5 h-3.5"></lucide-icon>
+          <lucide-icon name="search" class="w-3.5 h-3.5"></lucide-icon>
           <span>Search resources...</span>
           <kbd class="px-1.5 py-0.5 text-[10px] font-mono rounded bg-slate-800 text-slate-400 border border-slate-700">⌘K</kbd>
         </button>
 
-        <!-- Notification Bell Placeholder -->
+        <!-- Notification Bell -->
         <a
           routerLink="/notifications"
           class="relative p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
           title="Notifications"
         >
-          <lucide-icon name="Bell" class="w-4 h-4"></lucide-icon>
+          <lucide-icon name="bell" class="w-4 h-4"></lucide-icon>
           <span class="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-indigo-500 ring-2 ring-slate-900"></span>
         </a>
 
@@ -70,10 +72,25 @@ import { UserMenuComponent } from '../user-menu/user-menu.component';
         <app-user-menu></app-user-menu>
       </div>
     </header>
+
+    <!-- Global Search Command Palette Modal -->
+    <app-global-search-modal
+      [isOpen]="isSearchOpen()"
+      (closeModal)="isSearchOpen.set(false)"
+    ></app-global-search-modal>
   `,
 })
 export class AppHeaderComponent {
   private readonly navService = inject(NavigationService);
+  readonly isSearchOpen = signal<boolean>(false);
+
+  @HostListener('window:keydown', ['$event'])
+  handleKeyboardEvent(event: KeyboardEvent): void {
+    if ((event.metaKey || event.ctrlKey) && event.key === 'k') {
+      event.preventDefault();
+      this.isSearchOpen.update((v) => !v);
+    }
+  }
 
   toggleMobileNav(): void {
     this.navService.toggleMobileNav();
