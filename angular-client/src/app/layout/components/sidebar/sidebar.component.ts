@@ -100,6 +100,7 @@ export class SidebarComponent {
         { id: 'time-tracking', title: 'Time Tracking', route: '/time-tracking', icon: 'clock' },
         { id: 'reports', title: 'Sprint Reports', route: '/reports', icon: 'bar-chart-3' },
         { id: 'search', title: 'Global Search', route: '/search', icon: 'search' },
+        { id: 'audit', title: 'Audit Logs', route: '/audit', icon: 'shield-check' },
       ],
     },
     {
