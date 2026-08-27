@@ -11,6 +11,7 @@ import { FileUploaderComponent } from '@features/files/components/file-uploader/
 import { FileListComponent } from '@features/files/components/file-list/file-list.component';
 import { FileApiService } from '@features/files/services/file-api.service';
 import { FileState } from '@features/files/state/file.state';
+import { AiApiService } from '@features/ai/services/ai-api.service';
 import { OrganizationContextService } from '@core/context/organization-context.service';
 
 @Component({
@@ -24,6 +25,15 @@ import { OrganizationContextService } from '@core/context/organization-context.s
         [subtitle]="'Issue Details • Created ' + (t.createdAt || 'recently')"
       >
         <div class="flex items-center space-x-3">
+          <button
+            type="button"
+            (click)="onAiTaskBreakdown()"
+            [disabled]="isAiBreakdownLoading()"
+            class="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium text-xs shadow-lg shadow-indigo-600/20 transition-all flex items-center space-x-1.5"
+          >
+            <span>✨ AI Subtask Breakdown</span>
+          </button>
+
           <button
             type="button"
             (click)="onDeleteTask()"
@@ -126,6 +136,7 @@ export class TaskDetailPageComponent implements OnInit {
   private readonly commentState = inject(CommentState);
   private readonly fileApi = inject(FileApiService);
   private readonly fileState = inject(FileState);
+  private readonly aiApi = inject(AiApiService);
   private readonly orgContext = inject(OrganizationContextService);
   private readonly router = inject(Router);
 
@@ -133,6 +144,7 @@ export class TaskDetailPageComponent implements OnInit {
 
   readonly isPostingComment = signal<boolean>(false);
   readonly isUploadingFile = signal<boolean>(false);
+  readonly isAiBreakdownLoading = signal<boolean>(false);
 
   readonly task = this.taskState.selectedTask;
   readonly comments = this.commentState.comments;
@@ -149,6 +161,23 @@ export class TaskDetailPageComponent implements OnInit {
 
     this.fileApi.getFilesForEntity(this.id(), 'task').subscribe({
       next: (res) => this.fileState.setFiles(res.data),
+    });
+  }
+
+  onAiTaskBreakdown(): void {
+    const t = this.task();
+    if (!t) return;
+
+    this.isAiBreakdownLoading.set(true);
+    this.aiApi.taskBreakdown({
+      epicTitle: t.title,
+      epicDescription: t.description || 'Task issue description',
+    }).subscribe({
+      next: (res) => {
+        alert(`AI Copilot suggested ${res.data.suggestedTasks.length} subtasks.`);
+        this.isAiBreakdownLoading.set(false);
+      },
+      error: () => this.isAiBreakdownLoading.set(false),
     });
   }
 
